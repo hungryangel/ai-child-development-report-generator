@@ -33,6 +33,7 @@ lerna-debug.log*
 # 빌드 결과물
 build
 coverage
+.next
 
 # 임시 파일
 *.tmp

@@ -2,13 +2,19 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { ChildData } from '@/app/lib/types';
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-}
+// API 키 확인 및 Anthropic 클라이언트 초기화
+const getAnthropicClient = () => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+  if (!apiKey) {
+    console.error('ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.');
+    return null;
+  }
+
+  return new Anthropic({
+    apiKey: apiKey,
+  });
+};
 
 function getDevelopmentalCriteria(birthDate: string): string {
   const birth = new Date(birthDate);
@@ -95,8 +101,23 @@ ${developmentalCriteria}
 }
 
 export async function POST(request: NextRequest) {
+  console.log('API Route 시작: POST /api/generate-report');
+
   try {
+    // Anthropic 클라이언트 초기화
+    const anthropic = getAnthropicClient();
+
+    if (!anthropic) {
+      console.error('Anthropic 클라이언트 초기화 실패');
+      return NextResponse.json(
+        { error: 'API 설정에 문제가 있습니다. 관리자에게 문의하세요.' },
+        { status: 500 }
+      );
+    }
+
+    // 요청 데이터 파싱
     const data: ChildData = await request.json();
+    console.log('수신된 데이터:', { name: data.name, birthDate: data.birthDate });
 
     // 입력 데이터 검증
     if (!data.name || !data.birthDate || !data.className) {
@@ -107,11 +128,16 @@ export async function POST(request: NextRequest) {
     }
 
     const prompt = createPrompt(data);
+    console.log('프롬프트 생성 완료');
 
     // 스트리밍 응답 생성
+    const encoder = new TextEncoder();
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          console.log('Claude API 호출 시작');
+
           const response = await anthropic.messages.create({
             model: 'claude-3-5-sonnet-20241022',
             max_tokens: 4000,
@@ -123,24 +149,29 @@ export async function POST(request: NextRequest) {
             stream: true,
           });
 
+          console.log('스트리밍 시작');
+
           for await (const chunk of response) {
             if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text') {
               const text = chunk.delta.text;
-              controller.enqueue(
-                new TextEncoder().encode(`data: ${JSON.stringify({ text })}\n\n`)
-              );
+              const data = JSON.stringify({ text });
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             }
           }
 
-          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
+          console.log('스트리밍 완료');
+
         } catch (error) {
-          console.error('Claude API Error:', error);
-          controller.enqueue(
-            new TextEncoder().encode(`data: ${JSON.stringify({ 
-              text: '평가서 생성 중 오류가 발생했습니다. API 키를 확인하고 다시 시도해주세요.' 
-            })}\n\n`)
-          );
+          console.error('Claude API 오류:', error);
+
+          const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+          const errorData = JSON.stringify({
+            text: `평가서 생성 중 오류가 발생했습니다: ${errorMessage}`
+          });
+
+          controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
           controller.close();
         }
       }
@@ -151,13 +182,20 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type',
       },
     });
 
   } catch (error) {
-    console.error('API Route Error:', error);
+    console.error('API Route 오류:', error);
+
     return NextResponse.json(
-      { error: '평가서 생성 중 오류가 발생했습니다.', details: error instanceof Error ? error.message : '알 수 없는 오류' },
+      {
+        error: '평가서 생성 중 오류가 발생했습니다.',
+        details: error instanceof Error ? error.message : '알 수 없는 오류'
+      },
       { status: 500 }
     );
   }

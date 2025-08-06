@@ -36,7 +36,7 @@ import {
 } from '@tabler/icons-react';
 import { useState, useRef } from 'react';
 import { ChildData } from './lib/types';
-import { calculateAge, formatAgeText, streamReport } from './lib/utils';
+import { calculateAge, formatAgeText } from './lib/utils';
 
 export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -81,16 +81,89 @@ export default function HomePage() {
     }
   };
 
+  // 개선된 스트림 처리 함수
+  const streamReport = async (formData: ChildData) => {
+    console.log('streamReport 시작');
+
+    const response = await fetch('/api/generate-report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(formData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+
+        // 마지막 불완전한 줄은 다음 반복을 위해 보관
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+
+            if (dataStr === '[DONE]') {
+              console.log('스트리밍 완료 신호 수신');
+              return;
+            }
+
+            if (dataStr) {
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.text) {
+                  console.log('텍스트 수신:', data.text.substring(0, 50));
+                  setReport(prev => prev + data.text);
+                }
+              } catch (parseError) {
+                console.warn('JSON 파싱 실패:', dataStr);
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
   const handleSubmit = async (values: ChildData) => {
+    // 폼 유효성 검사
+    if (!form.isValid()) {
+      notifications.show({
+        title: '입력 오류',
+        message: '필수 항목을 모두 입력해주세요.',
+        color: 'red',
+        icon: <IconAlertCircle size={16} />,
+      });
+      return;
+    }
+
     setIsLoading(true);
     setReport('');
     setIsReportGenerated(false);
 
     try {
-      const stream = streamReport(values);
-      for await (const chunk of stream) {
-        setReport(prev => prev + chunk);
-      }
+      console.log('평가서 생성 시작');
+      await streamReport(values);
 
       setIsReportGenerated(true);
       notifications.show({
@@ -105,13 +178,13 @@ export default function HomePage() {
         reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 500);
     } catch (error) {
+      console.error('평가서 생성 오류:', error);
       notifications.show({
         title: '오류 발생',
-        message: '평가서 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        message: error instanceof Error ? error.message : '평가서 생성 중 오류가 발생했습니다.',
         color: 'red',
         icon: <IconAlertCircle size={16} />,
       });
-      console.error('Error generating report:', error);
     } finally {
       setIsLoading(false);
     }
@@ -165,96 +238,87 @@ export default function HomePage() {
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Group mb="md">
               <IconUser size={24} color="var(--mantine-color-indigo-6)" />
-              <Title order={3}>1. 아동 기본 정보</Title>
+              <Title order={3}>1. 기본 정보</Title>
             </Group>
 
             <Grid>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <TextInput
                   label="아동명"
-                  placeholder="예: 김다은"
-                  withAsterisk
+                  placeholder="홍길동"
+                  required
                   {...form.getInputProps('name')}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
-                <TextInput
-                  label="반명"
-                  placeholder="예: 햇살반"
-                  withAsterisk
-                  {...form.getInputProps('className')}
-                />
-              </Grid.Col>
-              <Grid.Col span={12}>
                 <DateInput
                   label="생년월일"
-                  placeholder="날짜를 선택해주세요"
-                  withAsterisk
-                  onChange={handleBirthDateChange}
+                  placeholder="생년월일 선택"
+                  required
                   maxDate={new Date()}
-                  valueFormat="YYYY년 MM월 DD일"
+                  onChange={handleBirthDateChange}
                 />
                 {calculatedAge && (
-                  <Text size="sm" c="indigo" mt={5} fw={500}>
-                    현재 연령: {calculatedAge}
+                  <Text size="sm" c="dimmed" mt={4}>
+                    현재 나이: {calculatedAge}
                   </Text>
                 )}
               </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="반명"
+                  placeholder="사랑반"
+                  required
+                  {...form.getInputProps('className')}
+                />
+              </Grid.Col>
             </Grid>
-          </Card>
 
-          {/* 2. 특성 */}
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Group mb="md">
-              <IconHeart size={24} color="var(--mantine-color-indigo-6)" />
-              <Title order={3}>2. 전반적인 아동 특성</Title>
-            </Group>
-
-            <Stack>
-                              <Textarea
-                label="전반적인 기질 및 어린이집 생활 적응도"
-                placeholder="예: 새로운 환경에 호기심이 많고 교사에게 안정적으로 애착을 보입니다. 또래 친구들과의 상호작용을 즐기며 하루 일과에 잘 적응하고 있습니다."
-                minRows={3}
-                withAsterisk
+            <Stack mt="md">
+              <Textarea
+                label="기질 및 적응 특성"
+                placeholder="예: 새로운 환경에 적응하는 시간이 필요하지만, 한번 적응하면 안정적입니다. 차분하고 신중한 성격이며..."
+                minRows={2}
+                required
                 {...form.getInputProps('temperament')}
               />
               <Textarea
-                label="가장 두드러지는 강점"
-                placeholder="예: 호기심이 많고 탐구하는 것을 좋아하며, 감정 표현이 풍부합니다. 새로운 활동에 적극적으로 참여하는 모습을 보입니다."
-                minRows={3}
-                withAsterisk
+                label="아동의 주요 강점"
+                placeholder="예: 언어 표현력이 뛰어나고, 또래와 잘 어울리며, 새로운 것에 대한 호기심이 많습니다..."
+                minRows={2}
+                required
                 {...form.getInputProps('strength')}
               />
             </Stack>
           </Card>
 
-          {/* 3. 발달 영역 */}
+          {/* 2. 발달 영역별 관찰 내용 */}
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Group mb="md">
-              <IconPuzzle size={24} color="var(--mantine-color-indigo-6)" />
-              <Title order={3}>3. 영역별 발달 관찰 내용</Title>
+              <IconPuzzle size={24} color="var(--mantine-color-orange-6)" />
+              <Title order={3}>2. 발달 영역별 관찰 내용</Title>
             </Group>
 
-            <Stack gap="lg">
-              {/* 신체운동 및 건강 */}
+            <Stack>
+              {/* 신체운동 건강 */}
               <div>
                 <Title order={4} c="gray.7" mb="sm">가. 신체운동 및 건강</Title>
                 <Stack gap="sm">
                   <Textarea
-                    label="신체활동 즐기기"
-                    placeholder="예: 계단을 혼자 오르내릴 수 있으며, 공을 발로 차거나 던지는 활동을 즐깁니다. 균형을 잡고 한 발로 서기도 시도합니다."
+                    label="신체 활동"
+                    placeholder="예: 대근육 활동을 좋아하며, 달리기와 점프하기를 즐깁니다. 균형감각이 발달하여 한 발로 서기가 가능합니다."
                     minRows={2}
                     {...form.getInputProps('physical.activity')}
                   />
                   <Textarea
-                    label="건강하게 생활하기"
-                    placeholder="예: 스스로 숟가락질을 하려고 시도하며, 배변 의사를 표현할 수 있습니다. 손 씻기를 교사와 함께 실천합니다."
+                    label="건강한 생활"
+                    placeholder="예: 스스로 손 씻기, 이 닦기를 실천하며, 건강한 음식에 관심을 보입니다."
                     minRows={2}
                     {...form.getInputProps('physical.health')}
                   />
                   <Textarea
-                    label="안전하게 생활하기"
-                    placeholder="예: '뜨거워' '위험해' 등의 말에 반응하여 행동을 멈춥니다. 교사 손을 잡고 안전하게 이동합니다."
+                    label="안전한 생활"
+                    placeholder="예: 위험한 상황을 인지하고 조심스럽게 행동합니다. 안전 규칙을 잘 따릅니다."
                     minRows={2}
                     {...form.getInputProps('physical.safety')}
                   />
@@ -269,19 +333,19 @@ export default function HomePage() {
                 <Stack gap="sm">
                   <Textarea
                     label="듣기와 말하기"
-                    placeholder="예: 두 단어를 연결하여 말합니다('엄마, 물'). 간단한 지시를 듣고 따라할 수 있습니다."
+                    placeholder="예: 다른 사람의 이야기를 주의 깊게 듣고, 자신의 경험을 순서대로 말할 수 있습니다."
                     minRows={2}
                     {...form.getInputProps('communication.listening')}
                   />
                   <Textarea
                     label="읽기와 쓰기에 관심 가지기"
-                    placeholder="예: 그림책을 자주 넘겨보며, 끼적이기 도구를 사용해 그림을 그리는 것을 좋아합니다."
+                    placeholder="예: 글자에 관심을 보이며, 자신의 이름을 써보려고 시도합니다. 책의 그림을 보고 이야기를 만들어 말합니다."
                     minRows={2}
                     {...form.getInputProps('communication.literacy')}
                   />
                   <Textarea
                     label="책과 이야기 즐기기"
-                    placeholder="예: 교사가 읽어주는 그림책에 집중하며, 익숙한 단어나 의성어를 따라 말합니다."
+                    placeholder="예: 책 읽기를 좋아하며, 등장인물에게 감정이입하여 이야기에 몰입합니다."
                     minRows={2}
                     {...form.getInputProps('communication.books')}
                   />
@@ -296,13 +360,13 @@ export default function HomePage() {
                 <Stack gap="sm">
                   <Textarea
                     label="나를 알고 존중하기"
-                    placeholder="예: 자신의 물건을 '내 거야'라고 표현하며, 거울 속 자기 모습을 보고 미소짓습니다."
+                    placeholder="예: 자신의 감정을 표현할 수 있으며, 자신의 의견을 당당히 말합니다."
                     minRows={2}
                     {...form.getInputProps('social.selfRespect')}
                   />
                   <Textarea
                     label="더불어 생활하기"
-                    placeholder="예: 친구의 행동에 관심을 보이고 모방합니다. 장난감 교환이나 차례 기다리기를 시도합니다."
+                    placeholder="예: 친구와 협력하여 놀이하며, 갈등 상황에서 타협점을 찾으려고 노력합니다."
                     minRows={2}
                     {...form.getInputProps('social.cooperation')}
                   />
@@ -317,13 +381,13 @@ export default function HomePage() {
                 <Stack gap="sm">
                   <Textarea
                     label="아름다움 찾아보기"
-                    placeholder="예: 주변의 새로운 사물이나 그림에 '우와'하며 관심을 보입니다. 밝고 선명한 색깔을 좋아합니다."
+                    placeholder="예: 자연의 아름다움을 발견하고 감탄하며, 예술 작품에 관심을 보입니다."
                     minRows={2}
                     {...form.getInputProps('art.aesthetics')}
                   />
                   <Textarea
                     label="창의적으로 표현하기"
-                    placeholder="예: 노래가 나오면 몸을 흔들거나 손뼉을 칩니다. 다양한 미술 재료를 손으로 탐색하며 표현합니다."
+                    placeholder="예: 다양한 미술 재료를 활용하여 창의적으로 표현하며, 음악에 맞춰 자유롭게 몸을 움직입니다."
                     minRows={2}
                     {...form.getInputProps('art.creativity')}
                   />
@@ -338,19 +402,19 @@ export default function HomePage() {
                 <Stack gap="sm">
                   <Textarea
                     label="탐구과정 즐기기"
-                    placeholder="예: 블록을 쌓았다가 무너뜨리기를 반복하며 즐깁니다. 새로운 장난감을 여러 방법으로 탐색합니다."
+                    placeholder="예: 궁금한 것이 있으면 직접 관찰하고 실험해보며, 결과를 예측하려고 합니다."
                     minRows={2}
                     {...form.getInputProps('nature.exploration')}
                   />
                   <Textarea
-                    label="생활속에서 탐구하기"
-                    placeholder="예: 물놀이를 할 때 물건을 띄워보며 즐거워합니다. 간단한 퍼즐이나 끼워넣기 놀잇감을 탐색합니다."
+                    label="생활 속에서 탐구하기"
+                    placeholder="예: 수학적 개념(크기, 길이, 무게 등)을 일상에서 발견하고 비교합니다."
                     minRows={2}
                     {...form.getInputProps('nature.dailyInquiry')}
                   />
                   <Textarea
                     label="자연과 더불어 살기"
-                    placeholder="예: 산책 중 꽃이나 곤충을 발견하면 호기심을 보입니다. 날씨 변화에 관심을 갖고 반응합니다."
+                    placeholder="예: 동식물을 아끼고 돌보며, 환경 보호의 중요성을 알고 실천합니다."
                     minRows={2}
                     {...form.getInputProps('nature.withNature')}
                   />
@@ -359,23 +423,23 @@ export default function HomePage() {
             </Stack>
           </Card>
 
-          {/* 4. 부모님께 드리는 글 */}
+          {/* 3. 부모님께 드리는 글 */}
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Group mb="md">
               <IconHeart size={24} color="var(--mantine-color-pink-6)" />
-              <Title order={3}>4. 부모님께 드리는 글</Title>
+              <Title order={3}>3. 부모님께 드리는 글</Title>
             </Group>
 
             <Stack>
               <Textarea
                 label="특별히 강조하고 싶은 아이의 강점이나 재능"
-                placeholder="예: 또래에 비해 언어 발달이 빠른 편이며, 자신의 생각을 명확하게 표현할 수 있습니다. 새로운 활동에 두려움 없이 도전하는 용기가 돋보입니다."
+                placeholder="예: 또래에 비해 언어 발달이 빠른 편이며, 자신의 생각을 명확하게 표현할 수 있습니다."
                 minRows={3}
                 {...form.getInputProps('parentMessage.strengths')}
               />
               <Textarea
                 label="가정에서 연계하여 지도하면 좋을 만한 부분"
-                placeholder="예: 친구와 갈등이 생겼을 때 말로 표현하는 방법을 격려해주시면 사회성 발달에 도움이 됩니다. 규칙적인 생활 습관을 가정에서도 꾸준히 실천해 주세요."
+                placeholder="예: 친구와 갈등이 생겼을 때 말로 표현하는 방법을 격려해주시면 사회성 발달에 도움이 됩니다."
                 minRows={3}
                 {...form.getInputProps('parentMessage.homeSupport')}
               />
@@ -388,6 +452,7 @@ export default function HomePage() {
               type="submit"
               size="lg"
               loading={isLoading}
+              disabled={!form.isValid() || isLoading}
               leftSection={isLoading ? null : <IconSparkles size={20} />}
               variant="gradient"
               gradient={{ from: 'indigo', to: 'blue' }}
@@ -427,10 +492,12 @@ export default function HomePage() {
                 </Tooltip>
                 <Tooltip label="공유하기">
                   <ActionIcon variant="light" size="lg" onClick={() => {
-                    navigator.share?.({
-                      title: `${form.values.name} 아동발달 평가서`,
-                      text: report.substring(0, 200) + '...'
-                    });
+                    if (navigator.share) {
+                      navigator.share({
+                        title: `${form.values.name} 아동발달 평가서`,
+                        text: report.substring(0, 200) + '...'
+                      });
+                    }
                   }}>
                     <IconShare size={16} />
                   </ActionIcon>

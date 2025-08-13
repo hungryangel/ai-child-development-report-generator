@@ -1,6 +1,7 @@
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import '@mantine/notifications/styles.css';
+import UnifiedNavigation from '@/components/UnifiedNavigation';
 
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
@@ -55,7 +56,10 @@ export default function RootLayout({
           }}
         >
           <Notifications position="top-right" zIndex={1000} />
-          {children}
+          <UnifiedNavigation />  {/* 👈 이 줄 추가! */}
+          <main className="min-h-screen bg-gray-50">
+            {children}
+          </main>
         </MantineProvider>
       </body>
     </html>

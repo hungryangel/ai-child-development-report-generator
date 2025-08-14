@@ -216,6 +216,9 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
         <Text size="lg" c="dimmed" ta="center">
           기존 평가서를 업로드하여 2024 개정 표준보육과정 기준으로 피드백받고 개선하세요
         </Text>
+        <Badge size="lg" variant="light" color="indigo">
+          보육교사 전문 도구
+        </Badge>
       </Stack>
 
       {/* 탭 네비게이션 */}
@@ -412,6 +415,14 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
           )}
         </Tabs.Panel>
       </Tabs>
+
+      {/* 푸터 */}
+      <Group justify="center" mt="xl" pt="xl">
+        <Text size="sm" c="dimmed" ta="center">
+          Powered by Claude AI · 2024 개정 표준보육과정 기반 · 보육교사 전용 도구
+        </Text>
+      </Group>
+
     </Container>
   );
 };

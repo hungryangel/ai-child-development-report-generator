@@ -338,6 +338,15 @@ export default function Dashboard() {
           transition: all 0.2s ease;
         }
       `}</style>
+
+      {/* 푸터 */}
+      <Group justify="center" mt="xl" pt="xl">
+        <Text size="sm" c="dimmed" ta="center">
+          Powered by Claude AI · 2024 개정 표준보육과정 기반 · 보육교사 전용 도구
+        </Text>
+      </Group>
+
+
     </Container>
   );
 }

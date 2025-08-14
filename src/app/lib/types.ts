@@ -17,10 +17,12 @@ export interface ChildData {
   social: {
     selfRespect: string;
     cooperation: string;
+    societyInterest?: string; // 만 3~5세만 사용되는 옵셔널 필드
   };
   art: {
     aesthetics: string;
     creativity: string;
+    appreciation?: string; // 만 3~5세만 사용되는 옵셔널 필드
   };
   nature: {
     exploration: string;

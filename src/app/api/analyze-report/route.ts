@@ -1,13 +1,4 @@
-// 연령 감지 (로깅용)
-    const ageMatch = reportText.match(/만\s*(\d+)세|(\d+)세/);
-    const detectedAge = ageMatch ? `${ageMatch[1] || ageMatch[2]}세` : '3-5세';
-
-    const analysisPrompt = createAnalysisPrompt(reportText);
-    console.log('📋 분석 프롬프트 생성 완료');
-    console.log('🎯 감지된 연령대:', detectedAge);
-
-    console.log('🤖 Claude API 호출 시작 (평가서 분석)');
-
+// src/app/api/analyze-report/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 interface AnalysisRequest {
@@ -33,6 +24,62 @@ interface AnalysisResponse {
   };
   suggestions: string[];
   positiveAspects: string[];
+}
+
+// 나이별 정확한 발달 기준 및 평가 영역 구조
+function getDevelopmentalCriteriaAndDomains(estimatedAge: string): { criteria: string; domains: { [key: string]: string[] } } {
+  if (estimatedAge.includes('0세') || estimatedAge.includes('1세')) {
+    return {
+      criteria: `
+[0~1세 발달 기준 - 2024 개정 표준보육과정]
+- 신체운동·건강: 다양한 감각 경험, 신체와 주변 탐색, 대소근육 조절, 기본 운동 시도, 도움받아 몸 깨끗이 하기
+- 의사소통: 표정·몸짓·말소리에 주의, 상대방 이야기 듣고 말소리 냄, 주변 그림과 상징 관심, 책에 관심
+- 사회관계: 나의 고유함 알아가기, 안정적 애착 형성, 또래 관심, 다른 사람 감정·행동 관심
+- 예술경험: 자연과 생활의 아름다움 느끼기, 소리·리듬·움직임으로 표현, 모방하기 즐김
+- 자연탐구: 주변 환경 호기심, 친숙한 물체 감각 탐색, 일상 수 관심, 동식물 관심, 날씨 변화 느끼기`,
+      domains: {
+        "신체운동건강": ["신체활동 즐기기", "건강하게 생활하기", "안전하게 생활하기"],
+        "의사소통": ["듣기와 말하기", "읽기와 쓰기에 관심 가지기", "책과 이야기 즐기기"],
+        "사회관계": ["나를 알고 존중하기", "더불어 생활하기"],
+        "예술경험": ["아름다움 찾아보기", "창의적으로 표현하기"],
+        "자연탐구": ["탐구과정 즐기기", "생활속에서 탐구하기", "자연과 더불어 살기"]
+      }
+    };
+  } else if (estimatedAge.includes('2세')) {
+    return {
+      criteria: `
+[2세 발달 기준 - 2024 개정 표준보육과정]
+- 신체운동·건강: 신체 인식하고 움직임, 대소근육 조절, 기본 운동 즐기기, 스스로 몸과 주변 깨끗이 하기
+- 의사소통: 표정·몸짓·말에 주의하여 듣기, 요구와 느낌 말하기, 끼적이며 표현 즐기기, 책에 관심과 상상
+- 사회관계: 나의 고유함과 욕구·감정 표현, 또래와 함께 놀이, 지켜야 할 약속 인식
+- 예술경험: 아름다움 느끼기, 익숙한 노래·리듬 표현, 움직임과 춤으로 표현, 상상놀이
+- 자연탐구: 사물과 자연 탐색, 수 관심, 공간·모양 탐색, 규칙성 관심, 사물 같고 다름 구분`,
+      domains: {
+        "신체운동건강": ["신체활동 즐리기", "건강하게 생활하기", "안전하게 생활하기"],
+        "의사소통": ["듣기와 말하기", "읽기와 쓰기에 관심 가지기", "책과 이야기 즐기기"],
+        "사회관계": ["나를 알고 존중하기", "더불어 생활하기"],
+        "예술경험": ["아름다움 찾아보기", "창의적으로 표현하기"],
+        "자연탐구": ["탐구과정 즐기기", "생활속에서 탐구하기", "자연과 더불어 살기"]
+      }
+    };
+  } else {
+    return {
+      criteria: `
+[3~5세 발달 기준 - 2024 개정 표준보육과정 및 누리과정]
+- 신체운동·건강: 신체움직임 조절, 이동·제자리·도구운동, 질병예방 실천, 안전 규칙 준수
+- 의사소통: 관심있게 듣기, 경험·느낌·생각 표현, 말과 글 관계 이해, 다양한 책과 이야기 즐기기
+- 사회관계: 나를 소중히 여기기, 친구와 협력하기, 갈등 해결, 지역사회와 다양한 문화 관심
+- 예술경험: 예술적 요소 탐색, 노래·움직임·미술로 창의적 표현, 다양한 예술 감상
+- 자연탐구: 지속적 호기심, 물체 특성·수량·공간 탐구, 생명과 자연환경 소중히 여기기`,
+      domains: {
+        "신체운동건강": ["신체활동 즐기기", "건강하게 생활하기", "안전하게 생활하기"],
+        "의사소통": ["듣기와 말하기", "읽기와 쓰기에 관심 가지기", "책과 이야기 즐기기"],
+        "사회관계": ["나를 알고 존중하기", "더불어 생활하기", "사회에 관심가지기"],
+        "예술경험": ["아름다움 찾아보기", "창의적으로 표현하기", "예술 감상하기"],
+        "자연탐구": ["탐구과정 즐기기", "생활속에서 탐구하기", "자연과 더불어 살기"]
+      }
+    };
+  }
 }
 
 // 개선된 JSON 파싱 함수
@@ -130,62 +177,6 @@ function generateDynamicFallback(reportText: string): AnalysisResponse {
   };
 }
 
-// 나이별 정확한 발달 기준 및 평가 영역 구조
-function getDevelopmentalCriteriaAndDomains(estimatedAge: string): { criteria: string; domains: { [key: string]: string[] } } {
-  if (estimatedAge.includes('0세') || estimatedAge.includes('1세')) {
-    return {
-      criteria: `
-[0~1세 발달 기준 - 2024 개정 표준보육과정]
-• 신체운동·건강: 다양한 감각 경험, 신체와 주변 탐색, 대소근육 조절, 기본 운동 시도, 도움받아 몸 깨끗이 하기
-• 의사소통: 표정·몸짓·말소리에 주의, 상대방 이야기 듣고 말소리 냄, 주변 그림과 상징 관심, 책에 관심
-• 사회관계: 나의 고유함 알아가기, 안정적 애착 형성, 또래 관심, 다른 사람 감정·행동 관심
-• 예술경험: 자연과 생활의 아름다움 느끼기, 소리·리듬·움직임으로 표현, 모방하기 즐김
-• 자연탐구: 주변 환경 호기심, 친숙한 물체 감각 탐색, 일상 수 관심, 동식물 관심, 날씨 변화 느끼기`,
-      domains: {
-        "신체운동건강": ["신체활동 즐기기", "건강하게 생활하기", "안전하게 생활하기"],
-        "의사소통": ["듣기와 말하기", "읽기와 쓰기에 관심 가지기", "책과 이야기 즐기기"],
-        "사회관계": ["나를 알고 존중하기", "더불어 생활하기"],
-        "예술경험": ["아름다움 찾아보기", "창의적으로 표현하기"],
-        "자연탐구": ["탐구과정 즐기기", "생활속에서 탐구하기", "자연과 더불어 살기"]
-      }
-    };
-  } else if (estimatedAge.includes('2세')) {
-    return {
-      criteria: `
-[2세 발달 기준 - 2024 개정 표준보육과정]
-• 신체운동·건강: 신체 인식하고 움직임, 대소근육 조절, 기본 운동 즐기기, 스스로 몸과 주변 깨끗이 하기
-• 의사소통: 표정·몸짓·말에 주의하여 듣기, 요구와 느낌 말하기, 끼적이며 표현 즐기기, 책에 관심과 상상
-• 사회관계: 나의 고유함과 욕구·감정 표현, 또래와 함께 놀이, 지켜야 할 약속 인식
-• 예술경험: 아름다움 느끼기, 익숙한 노래·리듬 표현, 움직임과 춤으로 표현, 상상놀이
-• 자연탐구: 사물과 자연 탐색, 수 관심, 공간·모양 탐색, 규칙성 관심, 사물 같고 다름 구분`,
-      domains: {
-        "신체운동건강": ["신체활동 즐기기", "건강하게 생활하기", "안전하게 생활하기"],
-        "의사소통": ["듣기와 말하기", "읽기와 쓰기에 관심 가지기", "책과 이야기 즐기기"],
-        "사회관계": ["나를 알고 존중하기", "더불어 생활하기"],
-        "예술경험": ["아름다움 찾아보기", "창의적으로 표현하기"],
-        "자연탐구": ["탐구과정 즐기기", "생활속에서 탐구하기", "자연과 더불어 살기"]
-      }
-    };
-  } else {
-    return {
-      criteria: `
-[3~5세 발달 기준 - 2024 개정 표준보육과정 및 누리과정]
-• 신체운동·건강: 신체움직임 조절, 이동·제자리·도구운동, 질병예방 실천, 안전 규칙 준수
-• 의사소통: 관심있게 듣기, 경험·느낌·생각 표현, 말과 글 관계 이해, 다양한 책과 이야기 즐기기
-• 사회관계: 나를 소중히 여기기, 친구와 협력하기, 갈등 해결, 지역사회와 다양한 문화 관심
-• 예술경험: 예술적 요소 탐색, 노래·움직임·미술로 창의적 표현, 다양한 예술 감상
-• 자연탐구: 지속적 호기심, 물체 특성·수량·공간 탐구, 생명과 자연환경 소중히 여기기`,
-      domains: {
-        "신체운동건강": ["신체활동 즐기기", "건강하게 생활하기", "안전하게 생활하기"],
-        "의사소통": ["듣기와 말하기", "읽기와 쓰기에 관심 가지기", "책과 이야기 즐기기"],
-        "사회관계": ["나를 알고 존중하기", "더불어 생활하기", "사회에 관심가지기"],
-        "예술경험": ["아름다움 찾아보기", "창의적으로 표현하기", "예술 감상하기"],
-        "자연탐구": ["탐구과정 즐기기", "생활속에서 탐구하기", "자연과 더불어 살기"]
-      }
-    };
-  }
-}
-
 // 개선된 분석 프롬프트 생성 (나이별 정확한 영역 구조 반영)
 function createAnalysisPrompt(reportText: string): string {
   const ageMatch = reportText.match(/만\s*(\d+)세|(\d+)세/);
@@ -265,8 +256,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 연령 감지 (로깅용)
+    const ageMatch = reportText.match(/만\s*(\d+)세|(\d+)세/);
+    const detectedAge = ageMatch ? `${ageMatch[1] || ageMatch[2]}세` : '3-5세';
+
     const analysisPrompt = createAnalysisPrompt(reportText);
     console.log('📋 분석 프롬프트 생성 완료');
+    console.log('🎯 감지된 연령대:', detectedAge);
 
     console.log('🤖 Claude API 호출 시작 (평가서 분석)');
 
@@ -320,8 +316,9 @@ export async function POST(request: NextRequest) {
 
     // 에러 발생 시에도 동적 fallback 제공
     try {
-      const { reportText } = await request.json();
-      const emergencyFallback = generateDynamicFallback(reportText || '기본 평가서 내용');
+      const requestBody = await request.json();
+      const reportText = requestBody.reportText || '기본 평가서 내용';
+      const emergencyFallback = generateDynamicFallback(reportText);
 
       return NextResponse.json({
         ...emergencyFallback,

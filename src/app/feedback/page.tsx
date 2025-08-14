@@ -1,199 +1,157 @@
-// src/app/feedback/page.tsx (기존 로직 + Mantine 스타일)
+// src/app/feedback/page.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { Container, Title, Text, Paper, Textarea, Button, Group, Stack, Tabs, Progress, Badge, Card, Grid } from '@mantine/core';
-import { IconUpload, IconFileText, IconCheck, IconAlertCircle, IconTarget, IconTrendingUp, IconDownload } from '@tabler/icons-react';
+import {
+  Container, Title, Text, Paper, Textarea, Button, Group, Stack, Tabs,
+  Progress, Badge, Card, Grid, Alert, Select, TextInput
+} from '@mantine/core';
+import {
+  IconUpload, IconFileText, IconCheck, IconAlertCircle, IconTarget,
+  IconTrendingUp, IconDownload, IconInfoCircle, IconCalendar, IconUser
+} from '@tabler/icons-react';
 
 const ReportFeedbackSystem = () => {
   const [uploadedText, setUploadedText] = useState('');
+  const [childAge, setChildAge] = useState('');
+  const [childName, setChildName] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [improvedReport, setImprovedReport] = useState('');
   const [activeTab, setActiveTab] = useState('upload');
+  const [validationError, setValidationError] = useState('');
 
-  // 기존 분석 로직 그대로 유지
-  const analyzeReport = async (reportText) => {
+  // 연령 옵션 (실제 개월수까지 세분화)
+  const ageOptions = [
+    { value: '0', label: '만 0세 (0~11개월)' },
+    { value: '1', label: '만 1세 (12~23개월)' },
+    { value: '2', label: '만 2세 (24~35개월)' },
+    { value: '3', label: '만 3세 (36~47개월)' },
+    { value: '4', label: '만 4세 (48~59개월)' },
+    { value: '5', label: '만 5세 (60~71개월)' },
+    { value: '6', label: '만 6세 (72개월 이상)' }
+  ];
+
+  // 입력 유효성 검사
+  const validateInputs = () => {
+    if (!uploadedText.trim()) {
+      setValidationError('평가서 내용을 입력해주세요.');
+      return false;
+    }
+    if (uploadedText.length < 100) {
+      setValidationError('분석을 위해 평가서 내용을 최소 100자 이상 입력해주세요.');
+      return false;
+    }
+    if (!childAge) {
+      setValidationError('아동의 연령을 선택해주세요. 정확한 분석을 위해 필수입니다.');
+      return false;
+    }
+    if (!childName.trim()) {
+      setValidationError('아동명을 입력해주세요.');
+      return false;
+    }
+    setValidationError('');
+    return true;
+  };
+
+  // 분석 로직 (연령 정보 포함)
+  const analyzeReport = async () => {
+    if (!validateInputs()) {
+      return;
+    }
+
     setIsAnalyzing(true);
 
     try {
-      const analysisPrompt = `
-당신은 아동발달 전문가입니다. 업로드된 평가서를 2024 개정 표준보육과정 기준으로 분석하고 피드백해주세요.
-
-[업로드된 평가서]
-${reportText}
-
-다음 JSON 형식으로 분석 결과를 제공해주세요:
-
-{
-  "basicInfo": {
-    "childName": "추출된 아동명",
-    "age": "추출된 나이",
-    "className": "추출된 반명"
-  },
-  "overallScore": 85,
-  "domainAnalysis": {
-    "신체운동건강": {
-      "score": 80,
-      "strengths": ["운동능력 우수", "구체적 사례 풍부"],
-      "improvements": ["안전생활 부분 보완 필요"]
-    },
-    "의사소통": {
-      "score": 90,
-      "strengths": ["언어발달 상세 기술", "책 활동 구체적"],
-      "improvements": []
-    },
-    "사회관계": {
-      "score": 85,
-      "strengths": ["친구관계 잘 관찰됨"],
-      "improvements": ["자아존중 영역 추가 필요"]
-    },
-    "예술경험": {
-      "score": 75,
-      "strengths": ["창의성 언급"],
-      "improvements": ["감상 활동 사례 부족"]
-    },
-    "자연탐구": {
-      "score": 80,
-      "strengths": ["호기심 잘 표현"],
-      "improvements": ["수학적 사고 관련 내용 추가"]
-    }
-  },
-  "suggestions": [
-    "안전하게 생활하기 영역에 구체적 사례 추가 권장",
-    "예술 감상 활동 관련 관찰 내용 보완",
-    "수학적 사고력 발달 상황 추가 기술"
-  ],
-  "positiveAspects": [
-    "전문용어 적절히 사용",
-    "아동의 강점 잘 부각",
-    "부모에게 따뜻한 어조로 전달"
-  ]
-}
-
-JSON만 반환하고 다른 설명은 생략해주세요.`;
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
+      const response = await fetch('/api/analyze-report', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{ role: "user", content: analysisPrompt }]
-        })
+          reportText: `[아동명: ${childName}] [나이: 만 ${childAge}세] ${uploadedText}`,
+          analysisType: 'full'
+        }),
       });
 
-      const data = await response.json();
-      let responseText = data.content[0].text;
+      if (!response.ok) {
+        throw new Error(`분석 요청 실패: ${response.status}`);
+      }
 
-      responseText = responseText.replace(/```json\s?/g, "").replace(/```\s?/g, "").trim();
-      const analysisResult = JSON.parse(responseText);
-
-      setAnalysis(analysisResult);
+      const analysisData = await response.json();
+      setAnalysis(analysisData);
       setActiveTab('results');
 
     } catch (error) {
       console.error('분석 오류:', error);
-      // 샘플 데이터로 대체 (기존 로직 그대로)
-      setAnalysis({
-        basicInfo: {
-          childName: "분석된 아동",
-          age: "만 4세 2개월",
-          className: "해바라기반"
-        },
-        overallScore: 82,
-        domainAnalysis: {
-          "신체운동건강": {
-            score: 85,
-            strengths: ["대근육 발달 우수하게 기술", "구체적 운동 사례 풍부"],
-            improvements: ["안전생활 영역 세부 사례 보완 필요"]
-          },
-          "의사소통": {
-            score: 90,
-            strengths: ["언어 발달 상황 상세히 관찰", "책 읽기 활동 구체적"],
-            improvements: []
-          },
-          "사회관계": {
-            score: 78,
-            strengths: ["또래관계 관찰 우수"],
-            improvements: ["자아존중감 발달 부분 추가 필요", "갈등해결 과정 사례 보완"]
-          },
-          "예술경험": {
-            score: 75,
-            strengths: ["창의적 표현 활동 언급"],
-            improvements: ["예술 감상 활동 사례 부족", "음악 활동 관련 내용 보완"]
-          },
-          "자연탐구": {
-            score: 80,
-            strengths: ["호기심과 탐구력 잘 표현"],
-            improvements: ["수학적 사고 발달 상황 추가", "과학적 탐구 과정 세분화"]
-          }
-        },
-        suggestions: [
-          "안전하게 생활하기 영역에 실제 안전 규칙 준수 사례 추가",
-          "예술 감상 활동(그림 보기, 음악 듣기 등) 관련 구체적 관찰 내용 보완",
-          "수와 연산, 공간과 도형 관련 수학적 사고 발달 상황 추가",
-          "과학적 탐구 과정(예측-실험-결론)의 단계별 관찰 내용 세분화"
-        ],
-        positiveAspects: [
-          "2024 개정 표준보육과정의 5개 영역이 모두 포함됨",
-          "전문용어를 적절히 사용하여 교사의 전문성이 드러남",
-          "아동의 개별적 특성과 강점이 잘 부각됨",
-          "부모가 이해하기 쉬운 따뜻하고 구체적인 어조로 작성됨"
-        ]
-      });
-      setActiveTab('results');
+      setValidationError(error instanceof Error ? error.message : '분석 중 오류가 발생했습니다.');
+    } finally {
+      setIsAnalyzing(false);
     }
-
-    setIsAnalyzing(false);
   };
 
-  // 기존 개선된 평가서 생성 로직 그대로 유지
-  const generateImprovedReport = async () => {
+  // 개선된 평가서 생성
+  const generateImprovement = async () => {
     if (!analysis) return;
 
-    const improvementPrompt = `
-기존 평가서를 바탕으로 2024 개정 표준보육과정에 더욱 부합하는 개선된 평가서를 작성해주세요.
-
-[원본 평가서]
-${uploadedText}
-
-[개선 사항]
-${analysis.suggestions.map(s => `- ${s}`).join('\n')}
-
-기존 평가서의 좋은 부분은 유지하되, 위의 개선사항을 반영하여 더욱 완성도 높은 평가서로 재작성해주세요.
-2024 개정 표준보육과정의 5개 영역이 균형있게 포함되도록 하고, 전문적이면서 따뜻한 어조를 유지해주세요.`;
-
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
+      const response = await fetch('/api/improve-report', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4000,
-          messages: [{ role: "user", content: improvementPrompt }]
-        })
+          originalReport: uploadedText,
+          analysisResult: analysis,
+          improvementLevel: 'comprehensive'
+        }),
       });
 
-      const data = await response.json();
-      setImprovedReport(data.content[0].text);
-      setActiveTab('improved');
+      if (!response.ok) {
+        throw new Error('개선 요청 실패');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('스트림 읽기 실패');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let improvedContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === '[DONE]') {
+              setImprovedReport(improvedContent);
+              setActiveTab('improved');
+              return;
+            }
+            if (dataStr) {
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.text) {
+                  improvedContent += data.text;
+                  setImprovedReport(improvedContent);
+                }
+              } catch (e) {
+                // JSON 파싱 실패 시 무시
+              }
+            }
+          }
+        }
+      }
 
     } catch (error) {
       console.error('개선 오류:', error);
-      setImprovedReport(`
-## 개선된 아동발달 평가서
-
-**아동명:** ${analysis.basicInfo.childName}
-**현재 연령:** ${analysis.basicInfo.age}
-**반명:** ${analysis.basicInfo.className}
-
-[샘플 개선된 평가서 내용...]
-      `);
+      setImprovedReport(`# 개선된 평가서\n\n죄송합니다. 개선 과정에서 오류가 발생했습니다.\n다시 시도해주세요.`);
       setActiveTab('improved');
     }
   };
@@ -203,6 +161,25 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
     if (score >= 80) return 'blue';
     if (score >= 70) return 'yellow';
     return 'red';
+  };
+
+  const getAgeGroupInfo = (age: string) => {
+    const ageNum = parseInt(age);
+    if (ageNum <= 2) {
+      return {
+        group: '영아',
+        curriculum: '2024 개정 표준보육과정',
+        domains: ['신체운동·건강', '의사소통', '사회관계 (2개 세부영역)', '예술경험 (2개 세부영역)', '자연탐구'],
+        note: '영아기는 급속한 발달이 일어나는 시기로, 세밀한 관찰이 중요합니다.'
+      };
+    } else {
+      return {
+        group: '유아',
+        curriculum: '2024 개정 표준보육과정 및 누리과정',
+        domains: ['신체운동·건강', '의사소통', '사회관계 (3개 세부영역)', '예술경험 (3개 세부영역)', '자연탐구'],
+        note: '유아기는 사회성과 예술 감상 능력이 확장되는 시기입니다.'
+      };
+    }
   };
 
   return (
@@ -216,16 +193,17 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
         <Text size="lg" c="dimmed" ta="center">
           기존 평가서를 업로드하여 2024 개정 표준보육과정 기준으로 피드백받고 개선하세요
         </Text>
-        <Badge size="lg" variant="light" color="indigo">
-          보육교사 전문 도구
-        </Badge>
+        <Group>
+          <Badge size="lg" variant="light" color="indigo">보육교사 전문 도구</Badge>
+          <Badge size="lg" variant="light" color="green">연령별 맞춤 분석</Badge>
+        </Group>
       </Stack>
 
       {/* 탭 네비게이션 */}
       <Tabs value={activeTab} onChange={setActiveTab} mb="xl">
         <Tabs.List grow>
           <Tabs.Tab value="upload" leftSection={<IconUpload size={16} />}>
-            평가서 업로드
+            평가서 업로드 및 정보 입력
           </Tabs.Tab>
           <Tabs.Tab value="results" leftSection={<IconTarget size={16} />} disabled={!analysis}>
             분석 결과
@@ -235,33 +213,94 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
           </Tabs.Tab>
         </Tabs.List>
 
-        {/* 업로드 탭 */}
+        {/* 업로드 및 정보 입력 탭 */}
         <Tabs.Panel value="upload">
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Stack>
-              <Title order={3}>평가서 텍스트 입력</Title>
+          <Stack gap="lg">
+            {/* 연령 정보 입력의 중요성 안내 */}
+            <Alert variant="light" color="blue" icon={<IconInfoCircle />}>
+              <Text fw={500} mb="xs">정확한 분석을 위해 연령 정보가 필수입니다</Text>
+              <Text size="sm">
+                • <strong>0~2세</strong>: 영아기 발달 특성 (사회관계 2개, 예술경험 2개 세부영역)<br/>
+                • <strong>3~5세</strong>: 유아기 누리과정 (사회관계 3개, 예술경험 3개 세부영역 - 사회관심, 예술감상 추가)<br/>
+                • 연령별로 평가 기준과 발달 영역이 달라 정확한 연령 정보 없이는 적절한 분석이 불가능합니다.
+              </Text>
+            </Alert>
+
+            {/* 아동 기본 정보 입력 */}
+            <Card shadow="sm" padding="lg" radius="md" withBorder>
+              <Group mb="md">
+                <IconUser size={24} color="var(--mantine-color-indigo-6)" />
+                <Title order={3}>아동 기본 정보</Title>
+              </Group>
+
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <TextInput
+                    label="아동명"
+                    placeholder="아동의 이름을 입력하세요"
+                    value={childName}
+                    onChange={(e) => setChildName(e.target.value)}
+                    required
+                    leftSection={<IconUser size={16} />}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Select
+                    label="아동 연령"
+                    placeholder="연령을 선택하세요"
+                    data={ageOptions}
+                    value={childAge}
+                    onChange={(value) => setChildAge(value || '')}
+                    required
+                    leftSection={<IconCalendar size={16} />}
+                  />
+                </Grid.Col>
+              </Grid>
+
+              {/* 선택된 연령에 따른 정보 표시 */}
+              {childAge && (
+                <Alert variant="light" color="green" mt="md">
+                  <Text fw={500}>선택된 연령: 만 {childAge}세 ({getAgeGroupInfo(childAge).group})</Text>
+                  <Text size="sm" mt="xs">
+                    <strong>적용 기준:</strong> {getAgeGroupInfo(childAge).curriculum}<br/>
+                    <strong>평가 영역:</strong> {getAgeGroupInfo(childAge).domains.join(', ')}<br/>
+                    <strong>특징:</strong> {getAgeGroupInfo(childAge).note}
+                  </Text>
+                </Alert>
+              )}
+            </Card>
+
+            {/* 평가서 텍스트 입력 */}
+            <Card shadow="sm" padding="lg" radius="md" withBorder>
+              <Title order={3} mb="md">평가서 내용 입력</Title>
               <Textarea
                 value={uploadedText}
                 onChange={(e) => setUploadedText(e.target.value)}
                 placeholder="기존에 작성하신 평가서 내용을 여기에 붙여넣어 주세요..."
                 minRows={15}
                 maxRows={20}
+                description={`현재 ${uploadedText.length}자 (최소 100자 필요)`}
               />
-              <Group justify="space-between">
-                <Text size="sm" c="dimmed">
-                  최소 500자 이상 입력해주세요 (현재: {uploadedText.length}자)
-                </Text>
-                <Button
-                  onClick={() => analyzeReport(uploadedText)}
-                  disabled={uploadedText.length < 500 || isAnalyzing}
-                  loading={isAnalyzing}
-                  leftSection={<IconTarget size={16} />}
-                >
-                  AI 분석 시작
-                </Button>
-              </Group>
-            </Stack>
-          </Card>
+
+              {validationError && (
+                <Alert variant="light" color="red" mt="md" icon={<IconAlertCircle />}>
+                  {validationError}
+                </Alert>
+              )}
+
+              <Button
+                fullWidth
+                size="md"
+                mt="lg"
+                onClick={analyzeReport}
+                loading={isAnalyzing}
+                disabled={!uploadedText.trim() || !childAge || !childName.trim()}
+                leftSection={<IconTarget size={16} />}
+              >
+                {isAnalyzing ? '분석 중...' : '평가서 분석 시작'}
+              </Button>
+            </Card>
+          </Stack>
         </Tabs.Panel>
 
         {/* 분석 결과 탭 */}
@@ -271,101 +310,103 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
               {/* 전체 점수 */}
               <Card shadow="sm" padding="lg" radius="md" withBorder>
                 <Group justify="space-between" mb="md">
-                  <Title order={3}>전체 평가</Title>
-                  <Group>
-                    <Text size="xl" fw={700} c={getScoreColor(analysis.overallScore)}>
-                      {analysis.overallScore}점
-                    </Text>
-                    <Badge color={getScoreColor(analysis.overallScore)} variant="light">
-                      {analysis.overallScore >= 90 ? '우수' : analysis.overallScore >= 80 ? '양호' : '보통'}
-                    </Badge>
-                  </Group>
+                  <Title order={3}>전체 분석 결과</Title>
+                  <Badge size="xl" color={getScoreColor(analysis.overallScore)}>
+                    {analysis.overallScore}점
+                  </Badge>
                 </Group>
-                <Progress value={analysis.overallScore} color={getScoreColor(analysis.overallScore)} size="lg" />
+
+                <Grid>
+                  <Grid.Col span={{ base: 12, md: 4 }}>
+                    <Text><strong>아동명:</strong> {analysis.basicInfo.childName}</Text>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, md: 4 }}>
+                    <Text><strong>연령:</strong> {analysis.basicInfo.age}</Text>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, md: 4 }}>
+                    <Text><strong>반명:</strong> {analysis.basicInfo.className}</Text>
+                  </Grid.Col>
+                </Grid>
+
+                <Progress
+                  value={analysis.overallScore}
+                  color={getScoreColor(analysis.overallScore)}
+                  size="xl"
+                  mt="md"
+                />
               </Card>
 
               {/* 영역별 분석 */}
               <Card shadow="sm" padding="lg" radius="md" withBorder>
-                <Title order={3} mb="md">영역별 분석</Title>
+                <Title order={3} mb="md">영역별 세부 분석</Title>
                 <Grid>
                   {Object.entries(analysis.domainAnalysis).map(([domain, data]) => (
-                    <Grid.Col key={domain} span={{ base: 12, md: 6, lg: 4 }}>
+                    <Grid.Col span={{ base: 12, md: 6 }} key={domain}>
                       <Paper p="md" withBorder>
                         <Group justify="space-between" mb="xs">
                           <Text fw={500}>{domain}</Text>
-                          <Badge color={getScoreColor(data.score)} variant="light">
-                            {data.score}점
-                          </Badge>
+                          <Badge color={getScoreColor(data.score)}>{data.score}점</Badge>
                         </Group>
 
-                        {data.strengths.length > 0 && (
-                          <Stack gap="xs" mb="sm">
-                            <Text size="sm" fw={500} c="green">✓ 우수한 부분</Text>
-                            {data.strengths.map((strength, idx) => (
-                              <Text key={idx} size="xs" c="green">• {strength}</Text>
-                            ))}
-                          </Stack>
-                        )}
+                        <Text size="sm" c="green" mb="xs">
+                          <strong>강점:</strong>
+                        </Text>
+                        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                          {data.strengths.map((strength, idx) => (
+                            <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+                              {strength}
+                            </li>
+                          ))}
+                        </ul>
 
-                        {data.improvements.length > 0 && (
-                          <Stack gap="xs">
-                            <Text size="sm" fw={500} c="orange">⚡ 개선 포인트</Text>
-                            {data.improvements.map((improvement, idx) => (
-                              <Text key={idx} size="xs" c="orange">• {improvement}</Text>
-                            ))}
-                          </Stack>
-                        )}
+                        <Text size="sm" c="orange" mt="xs" mb="xs">
+                          <strong>개선사항:</strong>
+                        </Text>
+                        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                          {data.improvements.map((improvement, idx) => (
+                            <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
+                              {improvement}
+                            </li>
+                          ))}
+                        </ul>
                       </Paper>
                     </Grid.Col>
                   ))}
                 </Grid>
               </Card>
 
-              {/* 피드백 */}
-              <Grid>
-                <Grid.Col span={{ base: 12, lg: 6 }}>
-                  <Card shadow="sm" padding="lg" radius="md" withBorder>
-                    <Group mb="md">
-                      <IconAlertCircle size={20} color="var(--mantine-color-orange-6)" />
-                      <Title order={4}>개선 제안사항</Title>
-                    </Group>
-                    <Stack gap="sm">
-                      {analysis.suggestions.map((suggestion, idx) => (
-                        <Group key={idx} gap="sm" align="flex-start">
-                          <Badge size="sm" variant="outline" color="orange">{idx + 1}</Badge>
-                          <Text size="sm">{suggestion}</Text>
-                        </Group>
-                      ))}
-                    </Stack>
-                    <Button
-                      onClick={generateImprovedReport}
-                      mt="md"
-                      fullWidth
-                      leftSection={<IconTrendingUp size={16} />}
-                      color="orange"
-                    >
-                      개선된 평가서 생성하기
-                    </Button>
-                  </Card>
-                </Grid.Col>
+              {/* 개선 제안 */}
+              <Card shadow="sm" padding="lg" radius="md" withBorder>
+                <Title order={3} mb="md">구체적 개선 제안</Title>
+                <ul>
+                  {analysis.suggestions.map((suggestion, idx) => (
+                    <li key={idx} style={{ marginBottom: '0.5rem' }}>
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
 
-                <Grid.Col span={{ base: 12, lg: 6 }}>
-                  <Card shadow="sm" padding="lg" radius="md" withBorder>
-                    <Group mb="md">
-                      <IconCheck size={20} color="var(--mantine-color-green-6)" />
-                      <Title order={4}>우수한 부분</Title>
-                    </Group>
-                    <Stack gap="sm">
-                      {analysis.positiveAspects.map((aspect, idx) => (
-                        <Group key={idx} gap="sm" align="flex-start">
-                          <IconCheck size={16} color="var(--mantine-color-green-6)" />
-                          <Text size="sm">{aspect}</Text>
-                        </Group>
-                      ))}
-                    </Stack>
-                  </Card>
-                </Grid.Col>
-              </Grid>
+              {/* 우수한 점 */}
+              <Card shadow="sm" padding="lg" radius="md" withBorder>
+                <Title order={3} mb="md">현재 평가서의 우수한 점</Title>
+                <ul>
+                  {analysis.positiveAspects.map((aspect, idx) => (
+                    <li key={idx} style={{ marginBottom: '0.5rem' }}>
+                      {aspect}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
+              <Button
+                fullWidth
+                size="lg"
+                onClick={generateImprovement}
+                leftSection={<IconTrendingUp size={20} />}
+              >
+                개선된 평가서 생성하기
+              </Button>
             </Stack>
           )}
         </Tabs.Panel>
@@ -378,36 +419,22 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
                 <Title order={3}>개선된 평가서</Title>
                 <Button
                   leftSection={<IconDownload size={16} />}
-                  variant="light"
                   onClick={() => {
-                    const printContent = `
-                      <html>
-                        <head>
-                          <title>개선된 아동발달 평가서</title>
-                          <style>
-                            body { font-family: system-ui, sans-serif; line-height: 1.6; padding: 20px; }
-                            h1, h2, h3 { color: #1c7ed6; }
-                          </style>
-                        </head>
-                        <body>
-                          <div style="white-space: pre-wrap;">${improvedReport}</div>
-                        </body>
-                      </html>
-                    `;
-                    const printWindow = window.open('', '_blank');
-                    if (printWindow) {
-                      printWindow.document.write(printContent);
-                      printWindow.document.close();
-                      printWindow.print();
-                    }
+                    const blob = new Blob([improvedReport], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `개선된_평가서_${childName || '아동'}_${new Date().toISOString().split('T')[0]}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
                   }}
                 >
-                  인쇄/저장
+                  다운로드
                 </Button>
               </Group>
 
-              <Paper p="md" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
-                <Text component="pre" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+              <Paper p="md" style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                <Text style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                   {improvedReport}
                 </Text>
               </Paper>
@@ -415,14 +442,6 @@ ${analysis.suggestions.map(s => `- ${s}`).join('\n')}
           )}
         </Tabs.Panel>
       </Tabs>
-
-      {/* 푸터 */}
-      <Group justify="center" mt="xl" pt="xl">
-        <Text size="sm" c="dimmed" ta="center">
-          Powered by Claude AI · 2024 개정 표준보육과정 기반 · 보육교사 전용 도구
-        </Text>
-      </Group>
-
     </Container>
   );
 };

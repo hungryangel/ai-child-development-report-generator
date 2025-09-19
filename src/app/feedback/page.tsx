@@ -12,27 +12,46 @@ import {
   IconHeart, IconSparkles, IconSearch
 } from '@tabler/icons-react';
 
+// ------ 타입(가볍게) ------
+type DomainDetail = {
+  score: number;
+  strengths: string[];
+  improvements: string[];
+};
+type AnalysisResult = {
+  overallScore: number;
+  basicInfo?: { childName?: string; age?: string; className?: string };
+  domainAnalysis: Record<string, DomainDetail>;
+  positiveAspects: string[];
+  suggestions: string[];
+};
+
 const ReportFeedbackSystem = () => {
+  // 입력값
   const [uploadedText, setUploadedText] = useState('');
   const [childAge, setChildAge] = useState('');
   const [childName, setChildName] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [improvedReport, setImprovedReport] = useState('');
-  const [activeTab, setActiveTab] = useState('upload');
+
+  // 분석/개선 공통 상태
+  const [activeTab, setActiveTab] = useState<'upload' | 'results' | 'improved'>('upload');
   const [validationError, setValidationError] = useState('');
 
-  // 새로 추가된 상태들
+  // 분석 진행 상태
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
-  const [analysisStartTime, setAnalysisStartTime] = useState(null);
+  const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+
+  // 진행 중 안내 문구(분석)
   const [currentMessage, setCurrentMessage] = useState('');
   const [messageIndex, setMessageIndex] = useState(0);
 
-  // 개선된 평가서 생성 관련 상태들
+  // 개선 생성 상태
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGenerationComplete, setIsGenerationComplete] = useState(false);
   const [currentGenerationMessage, setCurrentGenerationMessage] = useState('');
   const [generationMessageIndex, setGenerationMessageIndex] = useState(0);
+  const [improvedReport, setImprovedReport] = useState('');
 
   // 격려 메시지들
   const encouragingMessages = [

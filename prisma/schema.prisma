@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model PreorderSignup {
+  id            String    @id @default(cuid())
+  emailHash     String    @unique
+  emailEnc      String
+  role          String?
+  orgName       String?
+  studentsCount Int?
+  interests     Json // ← SQLite에서는 String[] 대신 Json로 보관
+  consentAt     DateTime
+  ipHash        String
+  userAgent     String?
+  refCode       String    @default("")
+  createdAt     DateTime  @default(now())
+  verifiedAt    DateTime?
+}
+
+model EmailToken {
+  id        String    @id @default(cuid())
+  emailHash String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([emailHash])
+}
+
+model TrafficEvent {
+  id        String   @id @default(cuid())
+  type      String // visit|signup|share
+  path      String
+  referrer  String?
+  ipHash    String
+  userAgent String?
+  createdAt DateTime @default(now())
+}

@@ -1,3 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+body { @apply bg-brand-50 text-slate-800 antialiased; }
+
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

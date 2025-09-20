@@ -33,7 +33,8 @@ const ReportFeedbackSystem = () => {
   const [childName, setChildName] = useState('');
 
   // 분석/개선 공통 상태
-  const [activeTab, setActiveTab] = useState<'upload' | 'results' | 'improved'>('upload');
+  type TabType = 'upload' | 'results' | 'improved';
+  const [activeTab, setActiveTab] = useState<TabType>('upload');
   const [validationError, setValidationError] = useState('');
 
   // 분석 진행 상태
@@ -95,7 +96,7 @@ const ReportFeedbackSystem = () => {
 
       return () => clearInterval(interval);
     }
-  }, [isAnalyzing]);
+  }, [isAnalyzing, encouragingMessages.length]);
 
   // 개선된 평가서 생성 중 메시지 순환 효과
   useEffect(() => {
@@ -106,21 +107,21 @@ const ReportFeedbackSystem = () => {
 
       return () => clearInterval(interval);
     }
-  }, [isGenerating]);
+  }, [isGenerating, generationMessages.length]);
 
   // 현재 메시지 업데이트
   useEffect(() => {
     if (isAnalyzing) {
       setCurrentMessage(encouragingMessages[messageIndex]);
     }
-  }, [messageIndex, isAnalyzing]);
+  }, [messageIndex, isAnalyzing, encouragingMessages]);
 
   // 현재 생성 메시지 업데이트
   useEffect(() => {
     if (isGenerating) {
       setCurrentGenerationMessage(generationMessages[generationMessageIndex]);
     }
-  }, [generationMessageIndex, isGenerating]);
+  }, [generationMessageIndex, isGenerating, generationMessages]);
 
   // 입력 유효성 검사
   const validateInputs = () => {
@@ -177,7 +178,7 @@ const ReportFeedbackSystem = () => {
         throw new Error(`분석 요청 실패: ${response.status}`);
       }
 
-      const analysisData = await response.json();
+      const analysisData: AnalysisResult = await response.json();
       setAnalysis(analysisData);
       setIsAnalysisComplete(true);
       setActiveTab('results');
@@ -463,9 +464,6 @@ const ReportFeedbackSystem = () => {
 마. 자연탐구
 ...
 
-3. 부모님께 전달하고 싶은 특별한 내용
-...
-
 분석을 위해 최소 100자 이상 입력해주세요.`}
                 value={uploadedText}
                 onChange={(e) => setUploadedText(e.target.value)}
@@ -629,7 +627,7 @@ const ReportFeedbackSystem = () => {
                 </Text>
 
                 <Grid>
-                  {Object.entries(analysis.domainAnalysis).map(([domain, data]: [string, DomainDetail]) => (
+                  {Object.entries(analysis.domainAnalysis).map(([domain, data]) => (
                     <Grid.Col span={{ base: 12, md: 6 }} key={domain}>
                       <Paper p="md" withBorder>
                         <Group justify="space-between" mb="xs">
@@ -641,7 +639,7 @@ const ReportFeedbackSystem = () => {
                           <strong>강점:</strong>
                         </Text>
                         <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                          {data.strengths.map((strength: string, idx: number) => (
+                          {data.strengths.map((strength, idx) => (
                             <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
                               {strength}
                             </li>
@@ -652,7 +650,7 @@ const ReportFeedbackSystem = () => {
                           <strong>개선사항:</strong>
                         </Text>
                         <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                          {data.improvements.map((improvement: string, idx: number) => (
+                          {data.improvements.map((improvement, idx) => (
                             <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
                               {improvement}
                             </li>
@@ -671,7 +669,7 @@ const ReportFeedbackSystem = () => {
                   작성하신 평가서에서 발견된 강점과 잘 작성된 부분들입니다.
                 </Text>
                 <ul>
-                  {analysis.positiveAspects.map((aspect: string, idx: number) => (
+                  {analysis.positiveAspects.map((aspect, idx) => (
                     <li key={idx} style={{ marginBottom: '0.5rem' }}>
                       {aspect}
                     </li>
@@ -686,7 +684,7 @@ const ReportFeedbackSystem = () => {
                   더욱 전문적이고 완성도 높은 평가서 작성을 위한 구체적인 제안사항입니다.
                 </Text>
                 <ul>
-                  {analysis.suggestions.map((suggestion: string, idx: number) => (
+                  {analysis.suggestions.map((suggestion, idx) => (
                     <li key={idx} style={{ marginBottom: '0.5rem' }}>
                       {suggestion}
                     </li>

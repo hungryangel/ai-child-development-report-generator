@@ -23,16 +23,17 @@ import {
 } from '@tabler/icons-react';
 
 const ROUTES = {
-  PREORDER: '/',        // 사전등록 랜딩
-  GENERATE: '/generate',     // AI평가서 생성(기능 페이지 경로)
-  REVIEW: '/feedback',  // AI평가서 검토
+  PREORDER: '/',
+  GENERATE: '/generate',
+  REVIEW: '/feedback',
 } as const;
 
+// ✨ 수정된 NavItem 타입 정의
 type NavItem = {
   href: string;
   label: string;
   description: string;
-  icon: React.ComponentType<{ size?: number; stroke?: number }>;
+  icon: React.ComponentType<any>; // IconProps를 직접 쓰기보다, Mantine의 유연한 타입 요구사항에 맞춰 any로 설정합니다.
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -135,7 +136,6 @@ export default function UnifiedNavigation() {
               {NAV_ITEMS.map((item) => (
                 <LinkChip key={item.href} item={item} />
               ))}
-              {/* 👉 요청에 따라 상단 우측 “바로 써보기” 버튼은 제거했습니다. */}
             </Group>
 
             {/* 모바일 버거 */}

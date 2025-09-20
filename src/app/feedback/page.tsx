@@ -365,7 +365,7 @@ const ReportFeedbackSystem = () => {
       </Paper>
 
       {/* 탭 네비게이션 */}
-      <Tabs value={activeTab} onChange={setActiveTab} mb="xl">
+      <Tabs value={activeTab} onChange={(value) => setActiveTab((value as 'upload' | 'results' | 'improved') || 'upload')} mb="xl">
         <Tabs.List grow>
           <Tabs.Tab value="upload" leftSection={<IconUpload size={16} />}>
             평가서 업로드 및 정보 입력

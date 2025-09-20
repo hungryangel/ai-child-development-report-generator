@@ -629,7 +629,7 @@ const ReportFeedbackSystem = () => {
                 </Text>
 
                 <Grid>
-                  {Object.entries(analysis.domainAnalysis).map(([domain, data]) => (
+                  {Object.entries(analysis.domainAnalysis).map(([domain, data]: [string, DomainDetail]) => (
                     <Grid.Col span={{ base: 12, md: 6 }} key={domain}>
                       <Paper p="md" withBorder>
                         <Group justify="space-between" mb="xs">
@@ -641,7 +641,7 @@ const ReportFeedbackSystem = () => {
                           <strong>강점:</strong>
                         </Text>
                         <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                          {data.strengths.map((strength, idx) => (
+                          {data.strengths.map((strength: string, idx: number) => (
                             <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
                               {strength}
                             </li>
@@ -652,7 +652,7 @@ const ReportFeedbackSystem = () => {
                           <strong>개선사항:</strong>
                         </Text>
                         <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                          {data.improvements.map((improvement, idx) => (
+                          {data.improvements.map((improvement: string, idx: number) => (
                             <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
                               {improvement}
                             </li>
@@ -671,7 +671,7 @@ const ReportFeedbackSystem = () => {
                   작성하신 평가서에서 발견된 강점과 잘 작성된 부분들입니다.
                 </Text>
                 <ul>
-                  {analysis.positiveAspects.map((aspect, idx) => (
+                  {analysis.positiveAspects.map((aspect: string, idx: number) => (
                     <li key={idx} style={{ marginBottom: '0.5rem' }}>
                       {aspect}
                     </li>
@@ -686,7 +686,7 @@ const ReportFeedbackSystem = () => {
                   더욱 전문적이고 완성도 높은 평가서 작성을 위한 구체적인 제안사항입니다.
                 </Text>
                 <ul>
-                  {analysis.suggestions.map((suggestion, idx) => (
+                  {analysis.suggestions.map((suggestion: string, idx: number) => (
                     <li key={idx} style={{ marginBottom: '0.5rem' }}>
                       {suggestion}
                     </li>

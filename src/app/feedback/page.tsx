@@ -317,7 +317,7 @@ const ReportFeedbackSystem = () => {
     }
   };
 
-  const getScoreColor = (score) => {
+  const getScoreColor = (score: number) => {
     if (score >= 90) return 'green';
     if (score >= 80) return 'blue';
     if (score >= 70) return 'yellow';

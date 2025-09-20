@@ -16,7 +16,7 @@ export default async function AdminPage() {
     prisma.preorderSignup.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
-    }) as Promise<PreorderSignup[]>, // ✅ latest의 정확한 타입 부여
+    }) as Promise<PreorderSignup[]>, // 타입 명시
   ]);
 
   return (

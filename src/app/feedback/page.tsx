@@ -12,27 +12,47 @@ import {
   IconHeart, IconSparkles, IconSearch
 } from '@tabler/icons-react';
 
+// ------ 타입(가볍게) ------
+type DomainDetail = {
+  score: number;
+  strengths: string[];
+  improvements: string[];
+};
+type AnalysisResult = {
+  overallScore: number;
+  basicInfo?: { childName?: string; age?: string; className?: string };
+  domainAnalysis: Record<string, DomainDetail>;
+  positiveAspects: string[];
+  suggestions: string[];
+};
+
 const ReportFeedbackSystem = () => {
+  // 입력값
   const [uploadedText, setUploadedText] = useState('');
   const [childAge, setChildAge] = useState('');
   const [childName, setChildName] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [improvedReport, setImprovedReport] = useState('');
-  const [activeTab, setActiveTab] = useState('upload');
+
+  // 분석/개선 공통 상태
+  type TabType = 'upload' | 'results' | 'improved';
+  const [activeTab, setActiveTab] = useState<TabType>('upload');
   const [validationError, setValidationError] = useState('');
 
-  // 새로 추가된 상태들
+  // 분석 진행 상태
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
-  const [analysisStartTime, setAnalysisStartTime] = useState(null);
+  const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+
+  // 진행 중 안내 문구(분석)
   const [currentMessage, setCurrentMessage] = useState('');
   const [messageIndex, setMessageIndex] = useState(0);
 
-  // 개선된 평가서 생성 관련 상태들
+  // 개선 생성 상태
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGenerationComplete, setIsGenerationComplete] = useState(false);
   const [currentGenerationMessage, setCurrentGenerationMessage] = useState('');
   const [generationMessageIndex, setGenerationMessageIndex] = useState(0);
+  const [improvedReport, setImprovedReport] = useState('');
 
   // 격려 메시지들
   const encouragingMessages = [
@@ -76,7 +96,7 @@ const ReportFeedbackSystem = () => {
 
       return () => clearInterval(interval);
     }
-  }, [isAnalyzing]);
+  }, [isAnalyzing, encouragingMessages.length]);
 
   // 개선된 평가서 생성 중 메시지 순환 효과
   useEffect(() => {
@@ -87,21 +107,21 @@ const ReportFeedbackSystem = () => {
 
       return () => clearInterval(interval);
     }
-  }, [isGenerating]);
+  }, [isGenerating, generationMessages.length]);
 
   // 현재 메시지 업데이트
   useEffect(() => {
     if (isAnalyzing) {
       setCurrentMessage(encouragingMessages[messageIndex]);
     }
-  }, [messageIndex, isAnalyzing]);
+  }, [messageIndex, isAnalyzing, encouragingMessages]);
 
   // 현재 생성 메시지 업데이트
   useEffect(() => {
     if (isGenerating) {
       setCurrentGenerationMessage(generationMessages[generationMessageIndex]);
     }
-  }, [generationMessageIndex, isGenerating]);
+  }, [generationMessageIndex, isGenerating, generationMessages]);
 
   // 입력 유효성 검사
   const validateInputs = () => {
@@ -158,7 +178,7 @@ const ReportFeedbackSystem = () => {
         throw new Error(`분석 요청 실패: ${response.status}`);
       }
 
-      const analysisData = await response.json();
+      const analysisData: AnalysisResult = await response.json();
       setAnalysis(analysisData);
       setIsAnalysisComplete(true);
       setActiveTab('results');
@@ -298,7 +318,7 @@ const ReportFeedbackSystem = () => {
     }
   };
 
-  const getScoreColor = (score) => {
+  const getScoreColor = (score: number) => {
     if (score >= 90) return 'green';
     if (score >= 80) return 'blue';
     if (score >= 70) return 'yellow';
@@ -346,7 +366,7 @@ const ReportFeedbackSystem = () => {
       </Paper>
 
       {/* 탭 네비게이션 */}
-      <Tabs value={activeTab} onChange={setActiveTab} mb="xl">
+      <Tabs value={activeTab} onChange={(value) => setActiveTab((value as 'upload' | 'results' | 'improved') || 'upload')} mb="xl">
         <Tabs.List grow>
           <Tabs.Tab value="upload" leftSection={<IconUpload size={16} />}>
             평가서 업로드 및 정보 입력
@@ -442,9 +462,6 @@ const ReportFeedbackSystem = () => {
 라. 예술경험
 ...
 마. 자연탐구
-...
-
-3. 부모님께 전달하고 싶은 특별한 내용
 ...
 
 분석을 위해 최소 100자 이상 입력해주세요.`}

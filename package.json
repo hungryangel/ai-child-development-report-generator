@@ -7,22 +7,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "tailwind-init": "node_modules/.bin/tailwindcss init -p"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",
-    "@mantine/core": "^7.12.2",
     "@mantine/dates": "^7.12.2",
     "@mantine/form": "^7.12.2",
     "@mantine/hooks": "^7.12.2",
     "@mantine/notifications": "^7.12.2",
     "@prisma/client": "^6.16.2",
-    "@tabler/icons-react": "^3.11.0",
     "@vercel/analytics": "^1.5.0",
     "dayjs": "^1.11.10",
     "lru-cache": "^11.2.1",
     "lucide-react": "^0.539.0",
-    "next": "14.2.5",
+    "next": "^14.2.32",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
@@ -33,13 +32,14 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/tailwindcss": "^3.0.11",
+    "autoprefixer": "^10.4.21",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.5",
-    "postcss": "^8.4.40",
+    "postcss": "^8.5.6",
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
     "prisma": "^6.16.2",
-    "tailwindcss": "^4.1.13",
+    "tailwindcss": "^3.4.4",
     "typescript": "^5.5.3"
   }
 }

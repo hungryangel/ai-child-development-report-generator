@@ -18,6 +18,7 @@
     "@mantine/notifications": "^7.12.2",
     "@prisma/client": "^6.16.2",
     "@tabler/icons-react": "^3.11.0",
+    "@vercel/analytics": "^1.5.0",
     "dayjs": "^1.11.10",
     "lru-cache": "^11.2.1",
     "lucide-react": "^0.539.0",

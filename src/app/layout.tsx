@@ -4,7 +4,8 @@ import '@mantine/dates/styles.css';
 import '@mantine/notifications/styles.css';
 import './globals.css';
 
-import type { Metadata } from 'next';
+import { Analytics } from '@vercel/analytics/react';
+import type { Metadata } from 'next'
 import { ReactNode } from 'react';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <UnifiedNavigation />
           <main className="min-h-screen bg-gray-50">{children}</main>
         </MantineProvider>
+        <Analytics />
       </body>
     </html>
   );

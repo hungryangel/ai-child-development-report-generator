@@ -1,23 +1,15 @@
-// src/app/feedback/page.tsx - 최종 개선된 버전
+// src/app/feedback/page.tsx - 최종 개선된 버전 (모든 기능 포함)
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Container, Title, Text, Paper, Textarea, Button, Group, Stack, Tabs,
-  Progress, Badge, Card, Grid, Alert, Select, TextInput, Loader, Box
-} from '@mantine/core';
-import {
-  IconUpload, IconFileText, IconCheck, IconAlertCircle, IconTarget,
-  IconTrendingUp, IconDownload, IconInfoCircle, IconCalendar, IconUser,
-  IconHeart, IconSparkles, IconSearch
-} from '@tabler/icons-react';
 
-// ------ 타입(가볍게) ------
+// ------ 타입 정의 ------
 type DomainDetail = {
   score: number;
   strengths: string[];
   improvements: string[];
 };
+
 type AnalysisResult = {
   overallScore: number;
   basicInfo?: { childName?: string; age?: string; className?: string };
@@ -78,6 +70,7 @@ const ReportFeedbackSystem = () => {
 
   // 연령 옵션
   const ageOptions = [
+    { value: '', label: '연령을 선택하세요' },
     { value: '0', label: '만 0세 (0~11개월)' },
     { value: '1', label: '만 1세 (12~23개월)' },
     { value: '2', label: '만 2세 (24~35개월)' },
@@ -93,7 +86,6 @@ const ReportFeedbackSystem = () => {
       const interval = setInterval(() => {
         setMessageIndex((prev) => (prev + 1) % encouragingMessages.length);
       }, 3000); // 3초마다 메시지 변경
-
       return () => clearInterval(interval);
     }
   }, [isAnalyzing, encouragingMessages.length]);
@@ -104,7 +96,6 @@ const ReportFeedbackSystem = () => {
       const interval = setInterval(() => {
         setGenerationMessageIndex((prev) => (prev + 1) % generationMessages.length);
       }, 3000); // 3초마다 메시지 변경
-
       return () => clearInterval(interval);
     }
   }, [isGenerating, generationMessages.length]);
@@ -192,6 +183,76 @@ const ReportFeedbackSystem = () => {
     }
   };
 
+  // 개선된 평가서 생성
+  const generateImprovement = async () => {
+    if (!analysis) return;
+
+    setIsGenerating(true);
+    setIsGenerationComplete(false);
+    setGenerationMessageIndex(0);
+    setCurrentGenerationMessage(generationMessages[0]);
+    setImprovedReport('');
+    setActiveTab('improved');
+
+    try {
+      const response = await fetch('/api/improve-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          originalText: uploadedText,
+          childName: childName,
+          childAge: childAge,
+          analysisResult: analysis
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`개선된 평가서 생성 실패: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.content) {
+                  setImprovedReport(prev => prev + data.content);
+                }
+                if (data.error) {
+                  console.error('스트림 오류:', data.error);
+                  break;
+                }
+              } catch (e) {
+                console.error('JSON 파싱 오류:', e);
+              }
+            }
+          }
+        }
+      }
+
+      setIsGenerationComplete(true);
+    } catch (error) {
+      console.error('개선 생성 오류:', error);
+      setValidationError(error instanceof Error ? error.message : '개선된 평가서 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // 버튼 텍스트 결정
   const getButtonText = () => {
     if (isAnalyzing) return '분석 중...';
@@ -201,9 +262,9 @@ const ReportFeedbackSystem = () => {
 
   // 버튼 색상 결정
   const getButtonColor = () => {
-    if (isAnalysisComplete) return 'green';
-    if (isAnalyzing) return 'blue';
-    return 'indigo';
+    if (isAnalysisComplete) return 'bg-green-600 hover:bg-green-700';
+    if (isAnalyzing) return 'bg-blue-600 cursor-not-allowed';
+    return 'bg-indigo-600 hover:bg-indigo-700';
   };
 
   // 예상 소요 시간 계산
@@ -224,9 +285,9 @@ const ReportFeedbackSystem = () => {
 
   // 개선된 평가서 생성 버튼 색상 결정
   const getGenerationButtonColor = () => {
-    if (isGenerationComplete) return 'green';
-    if (isGenerating) return 'blue';
-    return 'indigo';
+    if (isGenerationComplete) return 'bg-green-600 hover:bg-green-700';
+    if (isGenerating) return 'bg-blue-600 cursor-not-allowed';
+    return 'bg-indigo-600 hover:bg-indigo-700';
   };
 
   // 예상 생성 시간 계산
@@ -235,582 +296,489 @@ const ReportFeedbackSystem = () => {
     if (wordCount < 500) return '약 1분';
     if (wordCount < 1000) return '약 1-2분';
     if (wordCount < 2000) return '약 2-3분';
-    return '약 3-4분';
-  };
-
-  // 개선된 평가서 생성
-  const generateImprovement = async () => {
-    if (!analysis) return;
-
-    // 중복 실행 방지
-    if (isGenerating || isGenerationComplete) {
-      return;
-    }
-
-    setIsGenerating(true);
-    setIsGenerationComplete(false);
-    setGenerationMessageIndex(0);
-    setCurrentGenerationMessage(generationMessages[0]);
-
-    try {
-      const response = await fetch('/api/improve-report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          originalReport: uploadedText,
-          analysisResult: analysis,
-          improvementLevel: 'comprehensive'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('개선 요청 실패');
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('스트림 읽기 실패');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let improvedContent = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6).trim();
-            if (dataStr === '[DONE]') {
-              setImprovedReport(improvedContent);
-              setIsGenerationComplete(true);
-              setActiveTab('improved');
-              return;
-            }
-            if (dataStr) {
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.text) {
-                  improvedContent += data.text;
-                  setImprovedReport(improvedContent);
-                }
-              } catch (e) {
-                // JSON 파싱 실패 시 무시
-              }
-            }
-          }
-        }
-      }
-
-    } catch (error) {
-      console.error('개선 오류:', error);
-      setImprovedReport(`# 개선된 평가서\n\n죄송합니다. 개선 과정에서 오류가 발생했습니다.\n다시 시도해주세요.`);
-      setIsGenerationComplete(false);
-      setActiveTab('improved');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'green';
-    if (score >= 80) return 'blue';
-    if (score >= 70) return 'yellow';
-    return 'red';
-  };
-
-  const getAgeGroupInfo = (age: string) => {
-    const ageNum = parseInt(age);
-    if (ageNum <= 2) {
-      return {
-        group: '영아',
-        curriculum: '2024 개정 표준보육과정',
-        domains: ['신체운동·건강', '의사소통', '사회관계 (2개 세부영역)', '예술경험 (2개 세부영역)', '자연탐구'],
-        note: '영아기는 급속한 발달이 일어나는 시기로, 세밀한 관찰이 중요합니다.'
-      };
-    } else {
-      return {
-        group: '유아',
-        curriculum: '2024 개정 표준보육과정 및 누리과정',
-        domains: ['신체운동·건강', '의사소통', '사회관계 (3개 세부영역)', '예술경험 (3개 세부영역)', '자연탐구'],
-        note: '유아기는 사회성과 예술 감상 능력이 확장되는 시기입니다.'
-      };
-    }
+    return '약 3-5분';
   };
 
   return (
-    <Container size="lg" py="xl">
-      {/* 헤더 */}
-      <Paper p="xl" radius="md" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* 헤더 */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">AI 평가서 검토</h1>
+          <p className="text-gray-600">
+            기존 평가서를 업로드하여 전문적인 피드백과 개선된 버전을 받아보세요
+          </p>
+        </div>
 
-        <Stack align="center" gap="md">
+        {/* 탭 네비게이션 */}
+        <div className="flex justify-center mb-8">
+          <div className="flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`px-6 py-3 rounded-md font-medium transition-colors flex items-center gap-2 ${
+                activeTab === 'upload'
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <span>📤</span>
+              <span>평가서 업로드</span>
+            </button>
+            <button
+              onClick={() => isAnalysisComplete && setActiveTab('results')}
+              disabled={!isAnalysisComplete}
+              className={`px-6 py-3 rounded-md font-medium transition-colors flex items-center gap-2 ${
+                activeTab === 'results'
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : isAnalysisComplete
+                    ? 'text-gray-500 hover:text-gray-700'
+                    : 'text-gray-300 cursor-not-allowed'
+              }`}
+            >
+              <span>📊</span>
+              <span>분석 결과</span>
+            </button>
+            <button
+              onClick={() => isGenerationComplete && setActiveTab('improved')}
+              disabled={!isGenerationComplete}
+              className={`px-6 py-3 rounded-md font-medium transition-colors flex items-center gap-2 ${
+                activeTab === 'improved'
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : isGenerationComplete
+                    ? 'text-gray-500 hover:text-gray-700'
+                    : 'text-gray-300 cursor-not-allowed'
+              }`}
+            >
+              <span>✨</span>
+              <span>개선 버전</span>
+            </button>
+          </div>
+        </div>
 
-          <IconSearch size={48} />
-          <Title order={1} ta="center" size="h2">
-            AI 평가서 피드백 시스템
-          </Title>
-          <Text ta="center" size="lg" opacity={0.9}>
-            기존 평가서를 업로드하여 2024 개정 표준보육과정 기준으로 피드백받고 개선하세요
-          </Text>
-          <Group>
-            <Badge color="rgba(255,255,255,0.2)" size="lg">보육교사 전문 도구</Badge>
-            <Badge color="rgba(255,255,255,0.2)" size="lg">연령별 맞춤 분석</Badge>
-          </Group>
-        </Stack>
-      </Paper>
+        {/* 업로드 탭 */}
+        {activeTab === 'upload' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+            <div className="space-y-6">
+              {validationError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600">⚠️</span>
+                    <span className="text-red-700 font-medium">입력 오류</span>
+                  </div>
+                  <p className="text-red-600 mt-1">{validationError}</p>
+                </div>
+              )}
 
-      {/* 탭 네비게이션 */}
-      <Tabs value={activeTab} onChange={(value) => setActiveTab((value as 'upload' | 'results' | 'improved') || 'upload')} mb="xl">
-        <Tabs.List grow>
-          <Tabs.Tab value="upload" leftSection={<IconUpload size={16} />}>
-            평가서 업로드 및 정보 입력
-          </Tabs.Tab>
-          <Tabs.Tab value="results" leftSection={<IconTarget size={16} />} disabled={!analysis}>
-            분석 결과
-          </Tabs.Tab>
-          <Tabs.Tab value="improved" leftSection={<IconTrendingUp size={16} />} disabled={!improvedReport}>
-            개선된 평가서
-          </Tabs.Tab>
-        </Tabs.List>
-
-        {/* 업로드 및 정보 입력 탭 */}
-        <Tabs.Panel value="upload">
-          <Stack gap="lg">
-            {/* 연령 정보 입력의 중요성 안내 */}
-            <Alert variant="light" color="blue" icon={<IconInfoCircle />}>
-              <Text fw={500} mb="xs">정확한 분석을 위해 연령 정보가 필수입니다</Text>
-              <Text size="sm">
-                • <strong>0~2세</strong>: 영아기 발달 특성 (사회관계 2개, 예술경험 2개 세부영역)<br/>
-                • <strong>3~5세</strong>: 유아기 누리과정 (사회관계 3개, 예술경험 3개 세부영역 - 사회관심, 예술감상 추가)<br/>
-                • 연령별로 평가 기준과 발달 영역이 달라 정확한 연령 정보 없이는 적절한 분석이 불가능합니다.
-              </Text>
-            </Alert>
-
-            {/* 아동 기본 정보 입력 */}
-            <Card shadow="sm" padding="lg" radius="md" withBorder>
-              <Group mb="md">
-                <IconUser size={24} color="var(--mantine-color-indigo-6)" />
-                <Title order={3}>아동 기본 정보</Title>
-              </Group>
-
-              <Grid>
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                  <TextInput
-                    label="아동명"
-                    placeholder="아동의 이름을 입력하세요"
+              {/* 기본 정보 입력 */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="flex items-center gap-2">
+                      <span>👤</span>
+                      <span>아동명 *</span>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
                     value={childName}
                     onChange={(e) => setChildName(e.target.value)}
-                    required
-                    leftSection={<IconUser size={16} />}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors"
+                    placeholder="분석할 평가서의 아동명을 입력하세요"
                   />
-                </Grid.Col>
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                  <Select
-                    label="아동 연령"
-                    placeholder="아동의 연령을 선택하세요"
-                    data={ageOptions}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="flex items-center gap-2">
+                      <span>📅</span>
+                      <span>연령 *</span>
+                    </span>
+                  </label>
+                  <select
                     value={childAge}
-                    onChange={(value) => setChildAge(value || '')}
-                    required
-                    leftSection={<IconCalendar size={16} />}
-                  />
-                </Grid.Col>
-              </Grid>
-
-              {/* 선택된 연령에 따른 정보 표시 */}
-              {childAge && (
-                <Alert variant="light" color="green" mt="md">
-                  <Text fw={500}>선택된 연령: 만 {childAge}세 ({getAgeGroupInfo(childAge).group})</Text>
-                  <Text size="sm" mt="xs">
-                    <strong>적용 기준:</strong> {getAgeGroupInfo(childAge).curriculum}<br/>
-                    <strong>평가 영역:</strong> {getAgeGroupInfo(childAge).domains.join(', ')}<br/>
-                    <strong>특징:</strong> {getAgeGroupInfo(childAge).note}
-                  </Text>
-                </Alert>
-              )}
-            </Card>
-
-            {/* 평가서 텍스트 입력 */}
-            <Card shadow="sm" padding="lg" radius="md" withBorder>
-              <Title order={3} mb="md">
-                <Group>
-                  <IconFileText size={20} />
-                  기존 평가서 내용
-                </Group>
-              </Title>
-
-              <Textarea
-                placeholder={`기존에 작성된 평가서 내용을 붙여넣어 주세요.
-
-예시:
-1. 전반적인 아동 특성 및 어린이집 생활 적응
-...
-
-2. 영역별 발달 관찰 내용
-가. 신체운동 및 건강
-...
-나. 의사소통
-...
-다. 사회관계
-...
-라. 예술경험
-...
-마. 자연탐구
-...
-
-분석을 위해 최소 100자 이상 입력해주세요.`}
-                value={uploadedText}
-                onChange={(e) => setUploadedText(e.target.value)}
-                minRows={8}
-                maxRows={15}
-                autosize
-              />
-
-              <Group justify="space-between" mt="xs">
-                <Text size="xs" c="dimmed">
-                  {uploadedText.length}/100자 이상 (현재: {uploadedText.length}자)
-                </Text>
-                {uploadedText.length > 0 && (
-                  <Text size="xs" c="blue">
-                    예상 분석 시간: {getEstimatedTime()}
-                  </Text>
-                )}
-              </Group>
-            </Card>
-
-            {validationError && (
-              <Alert variant="light" color="red" mt="md" icon={<IconAlertCircle />}>
-                {validationError}
-              </Alert>
-            )}
-
-            {/* 분석 시작 버튼 */}
-            <Card shadow="sm" padding="lg" radius="md" withBorder>
-              {isAnalyzing && (
-                <Box mb="md">
-                  <Group justify="center" gap="md">
-                    <Loader size="md" color="blue" />
-                    <div>
-                      <Text fw={500} size="lg" ta="center">
-                        평가서를 꼼꼼히 분석하고 있어요
-                      </Text>
-                      <Text size="sm" c="dimmed" ta="center" mt="xs">
-                        예상 소요 시간: {getEstimatedTime()}
-                      </Text>
-                    </div>
-                  </Group>
-
-                  <Box
-                    mt="md"
-                    p="md"
-                    style={{
-                      backgroundColor: 'var(--mantine-color-blue-0)',
-                      borderRadius: '8px',
-                      textAlign: 'center'
-                    }}
+                    onChange={(e) => setChildAge(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors"
                   >
-                    <Group justify="center" gap="xs" mb="xs">
-                      <IconHeart size={16} color="var(--mantine-color-red-6)" />
-                      <IconSparkles size={16} color="var(--mantine-color-yellow-6)" />
-                    </Group>
-                    <Text
-                      size="sm"
-                      fw={500}
-                      style={{
-                        color: 'var(--mantine-color-blue-7)',
-                        lineHeight: 1.4,
-                        minHeight: '40px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      {currentMessage}
-                    </Text>
-                  </Box>
-                </Box>
-              )}
+                    {ageOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-              <Button
-                fullWidth
-                size="lg"
-                color={getButtonColor()}
-                onClick={analyzeReport}
-                disabled={isAnalyzing || isAnalysisComplete}
-                leftSection={
-                  isAnalysisComplete ? <IconCheck size={20} /> :
-                  isAnalyzing ? <Loader size={20} /> :
-                  <IconTarget size={20} />
-                }
-              >
-                {getButtonText()}
-              </Button>
+              {/* 평가서 내용 입력 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <span className="flex items-center gap-2">
+                    <span>📝</span>
+                    <span>평가서 내용 *</span>
+                  </span>
+                </label>
+                <textarea
+                  value={uploadedText}
+                  onChange={(e) => setUploadedText(e.target.value)}
+                  rows={12}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors resize-none"
+                  placeholder="분석하고 싶은 평가서 내용을 복사하여 붙여넣거나 직접 입력하세요.
+더 정확한 분석을 위해 다음 내용이 포함되면 좋습니다:
+• 아동의 기본 정보 (이름, 나이, 반)
+• 각 발달 영역별 관찰 내용
+• 구체적인 행동 사례
+• 부모님께 전달하고 싶은 내용"
+                />
+                <div className="flex justify-between items-center mt-2">
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm text-gray-500">
+                      분석을 위해 최소 100자 이상 입력해주세요
+                    </p>
+                    {uploadedText.length >= 100 && (
+                      <div className="flex items-center gap-1 text-sm text-green-600">
+                        <span>✓</span>
+                        <span>분석 가능</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {uploadedText.length}자
+                  </p>
+                </div>
+              </div>
+
+              {/* 분석 안내 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-1">💡</span>
+                  <div>
+                    <h3 className="text-blue-800 font-medium mb-2">AI 평가서 분석 안내</h3>
+                    <ul className="text-blue-700 text-sm space-y-1">
+                      <li>• 2024 개정 표준보육과정 기준으로 평가서를 분석합니다</li>
+                      <li>• 영역별 발달 서술의 적절성과 완성도를 검토합니다</li>
+                      <li>• 구체적인 개선 방향과 전문적인 표현 방법을 제안합니다</li>
+                      <li>• 예상 소요 시간: {getEstimatedTime()}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* 분석 버튼 */}
+              <div className="flex justify-center">
+                <button
+                  onClick={analyzeReport}
+                  disabled={isAnalyzing || isAnalysisComplete}
+                  className={`
+                    px-8 py-4 rounded-lg font-semibold text-white transition-all duration-200
+                    ${getButtonColor()}
+                    flex items-center gap-3 min-w-[200px] justify-center
+                  `}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>분석 중...</span>
+                    </>
+                  ) : isAnalysisComplete ? (
+                    <>
+                      <span>✓</span>
+                      <span>분석 완료</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🎯</span>
+                      <span>평가서 분석 시작</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
               {isAnalysisComplete && (
-                <Alert variant="light" color="green" mt="md" icon={<IconCheck />}>
-                  <Text fw={500}>분석이 완료되었습니다!</Text>
-                  <Text size="sm" mt="xs">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span className="text-green-700 font-medium">분석이 완료되었습니다!</span>
+                  </div>
+                  <p className="text-green-600 text-sm mt-1">
                     분석 결과 탭에서 상세한 피드백을 확인하세요.
                     다른 평가서를 분석하려면 페이지를 새로고침하세요.
-                  </Text>
-                </Alert>
+                  </p>
+                </div>
               )}
-            </Card>
-          </Stack>
-        </Tabs.Panel>
+            </div>
+          </div>
+        )}
 
         {/* 분석 결과 탭 */}
-        <Tabs.Panel value="results">
-          {analysis && (
-            <Stack gap="lg">
-              {/* 분석 기준 안내 */}
-              <Alert variant="light" color="blue" icon={<IconInfoCircle />}>
-                <Text fw={500} mb="xs">📊 분석 점수에 대한 안내</Text>
-                <Text size="sm">
-                  이 점수는 <strong>아동의 발달 수준</strong>이 아닌, <strong>선생님이 작성하신 평가서의 품질</strong>을 평가한 것입니다.<br/>
-                  다음 4가지 기준으로 평가서의 전문성을 분석합니다:
-                </Text>
-                <ul style={{ marginTop: '0.5rem', fontSize: 'var(--mantine-font-size-sm)' }}>
-                  <li><strong>2024 개정 표준보육과정 반영도:</strong> 최신 교육과정 기준 용어와 영역 구조 활용</li>
-                  <li><strong>발달 영역 균형성:</strong> 5개 영역(신체운동·건강, 의사소통, 사회관계, 예술경험, 자연탐구)이 고르게 기술되었는지</li>
-                  <li><strong>구체적 행동 사례:</strong> "잘한다"가 아닌 "○○ 상황에서 ○○하는 모습" 형태의 구체적 관찰 내용</li>
-                  <li><strong>전문적 용어 사용:</strong> 발달적 의미 해석과 교육과정 전문 용어의 적절한 활용</li>
-                </ul>
-              </Alert>
+        {activeTab === 'results' && (
+          <div className="space-y-6">
+            {isAnalyzing && !isAnalysisComplete && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+                <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-6"></div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">평가서를 꼼꼼히 분석하고 있어요</h3>
+                <p className="text-gray-600 mb-4">예상 소요 시간: {getEstimatedTime()}</p>
 
-              {/* 전체 점수 */}
-              <Card shadow="sm" padding="lg" radius="md" withBorder>
-                <Group justify="space-between" mb="md">
-                  <Title order={3}>전체 분석 결과</Title>
-                  <Badge size="xl" color={getScoreColor(analysis.overallScore)}>
-                    {analysis.overallScore}점
-                  </Badge>
-                </Group>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <span className="text-green-600">✨</span>
+                    <span className="text-green-600">📝</span>
+                  </div>
+                  <p className="text-green-700 font-medium text-center" style={{ minHeight: '24px' }}>
+                    {currentMessage}
+                  </p>
+                </div>
 
-                <Grid>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Text><strong>아동명:</strong> {analysis.basicInfo?.childName || childName}</Text>
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Text><strong>연령:</strong> {analysis.basicInfo?.age || `만 ${childAge}세`}</Text>
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Text><strong>반명:</strong> {analysis.basicInfo?.className || '-'}</Text>
-                  </Grid.Col>
-                </Grid>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-indigo-600 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: '60%' }}
+                  ></div>
+                </div>
+              </div>
+            )}
 
-                <Progress
-                  value={analysis.overallScore}
-                  color={getScoreColor(analysis.overallScore)}
-                  size="xl"
-                  mt="md"
-                />
-              </Card>
-
-              {/* 영역별 분석 */}
-              <Card shadow="sm" padding="lg" radius="md" withBorder>
-                <Group justify="space-between" mb="md">
-                  <Title order={3}>영역별 세부 분석</Title>
-                  <Badge size="sm" variant="light" color="blue">
-                    {childAge ? `만 ${childAge}세 기준` : '연령별 기준'}
-                  </Badge>
-                </Group>
-
-                <Text size="sm" c="dimmed" mb="md">
-                  각 영역별로 평가서의 기술 수준을 분석한 결과입니다. 점수가 높을수록 해당 영역이 전문적이고 구체적으로 기술되었음을 의미합니다.
-                </Text>
-
-                <Grid>
-                  {Object.entries(analysis.domainAnalysis).map(([domain, data]) => (
-                    <Grid.Col span={{ base: 12, md: 6 }} key={domain}>
-                      <Paper p="md" withBorder>
-                        <Group justify="space-between" mb="xs">
-                          <Text fw={500}>{domain}</Text>
-                          <Badge color={getScoreColor(data.score)}>{data.score}점</Badge>
-                        </Group>
-
-                        <Text size="sm" c="green" mb="xs">
-                          <strong>강점:</strong>
-                        </Text>
-                        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                          {data.strengths.map((strength, idx) => (
-                            <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
-                              {strength}
-                            </li>
-                          ))}
-                        </ul>
-
-                        <Text size="sm" c="orange" mt="xs" mb="xs">
-                          <strong>개선사항:</strong>
-                        </Text>
-                        <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                          {data.improvements.map((improvement, idx) => (
-                            <li key={idx} style={{ fontSize: 'var(--mantine-font-size-sm)' }}>
-                              {improvement}
-                            </li>
-                          ))}
-                        </ul>
-                      </Paper>
-                    </Grid.Col>
-                  ))}
-                </Grid>
-              </Card>
-
-              {/* 우수한 점 */}
-              <Card shadow="sm" padding="lg" radius="md" withBorder>
-                <Title order={3} mb="md">✨ 현재 평가서의 우수한 점</Title>
-                <Text size="sm" c="dimmed" mb="md">
-                  작성하신 평가서에서 발견된 강점과 잘 작성된 부분들입니다.
-                </Text>
-                <ul>
-                  {analysis.positiveAspects.map((aspect, idx) => (
-                    <li key={idx} style={{ marginBottom: '0.5rem' }}>
-                      {aspect}
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-
-              {/* 개선 제안 */}
-              <Card shadow="sm" padding="lg" radius="md" withBorder>
-                <Title order={3} mb="md">📝 평가서 작성 개선 제안</Title>
-                <Text size="sm" c="dimmed" mb="md">
-                  더욱 전문적이고 완성도 높은 평가서 작성을 위한 구체적인 제안사항입니다.
-                </Text>
-                <ul>
-                  {analysis.suggestions.map((suggestion, idx) => (
-                    <li key={idx} style={{ marginBottom: '0.5rem' }}>
-                      {suggestion}
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-
-              {/* 종합 안내 */}
-              <Alert variant="light" color="blue">
-                <Text fw={500} mb="xs">💡 평가서 개선 활용 방법</Text>
-                <Text size="sm">
-                  1. <strong>개선 제안</strong>을 참고하여 부족한 영역을 보완해보세요<br/>
-                  2. <strong>우수한 점</strong>은 다른 평가서 작성 시에도 계속 활용하세요<br/>
-                  3. 아래 "개선된 평가서 생성하기" 버튼으로 AI가 제안하는 개선 버전을 확인할 수 있습니다<br/>
-                  4. 생성된 개선 버전을 참고하여 본인만의 스타일로 재작성해보세요
-                </Text>
-              </Alert>
-
-              {/* 개선된 평가서 생성 버튼 */}
-              <Card shadow="sm" padding="lg" radius="md" withBorder>
-                {isGenerating && (
-                  <Box mb="md">
-                    <Group justify="center" gap="md">
-                      <Loader size="md" color="blue" />
-                      <div>
-                        <Text fw={500} size="lg" ta="center">
-                          개선된 평가서를 생성하고 있어요
-                        </Text>
-                        <Text size="sm" c="dimmed" ta="center" mt="xs">
-                          예상 소요 시간: {getEstimatedGenerationTime()}
-                        </Text>
+            {isAnalysisComplete && analysis && (
+              <div className="space-y-6">
+                {/* 전체 점수 */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold mb-6">📊 종합 평가 점수</h3>
+                    <div className="relative w-32 h-32 mx-auto mb-6">
+                      <svg className="w-32 h-32 transform -rotate-90">
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="56"
+                          stroke="currentColor"
+                          strokeWidth="8"
+                          fill="none"
+                          className="text-gray-200"
+                        />
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="56"
+                          stroke="currentColor"
+                          strokeWidth="8"
+                          fill="none"
+                          strokeDasharray={`${2 * Math.PI * 56}`}
+                          strokeDashoffset={`${2 * Math.PI * 56 * (1 - analysis.overallScore / 100)}`}
+                          className={`transition-all duration-1000 ${
+                            analysis.overallScore >= 80 ? 'text-green-500' :
+                            analysis.overallScore >= 60 ? 'text-yellow-500' : 'text-red-500'
+                          }`}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`text-3xl font-bold ${
+                          analysis.overallScore >= 80 ? 'text-green-600' :
+                          analysis.overallScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {analysis.overallScore}
+                        </span>
                       </div>
-                    </Group>
+                    </div>
+                    <p className="text-gray-600 text-lg">
+                      {analysis.overallScore >= 80 ? '우수한 평가서입니다! 👍' :
+                       analysis.overallScore >= 60 ? '양호한 평가서입니다 😊' :
+                       '개선이 필요한 평가서입니다 💪'}
+                    </p>
+                  </div>
+                </div>
 
-                    <Box
-                      mt="md"
-                      p="md"
-                      style={{
-                        backgroundColor: 'var(--mantine-color-green-0)',
-                        borderRadius: '8px',
-                        textAlign: 'center'
-                      }}
+                {/* 잘된 점과 개선 제안 */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* 우수한 점 */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold mb-4 text-green-700 flex items-center gap-2">
+                      <span>✅</span>
+                      <span>우수한 점</span>
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      이미 잘 작성된 부분들입니다. 이런 점들은 다른 평가서에서도 활용해보세요.
+                    </p>
+                    <ul className="space-y-3">
+                      {analysis.positiveAspects.map((aspect, index) => (
+                        <li key={index} className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
+                          <span className="text-green-600 mt-1 flex-shrink-0">•</span>
+                          <span className="text-gray-700">{aspect}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* 개선 제안 */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold mb-4 text-blue-700 flex items-center gap-2">
+                      <span>📝</span>
+                      <span>개선 제안</span>
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      더욱 전문적이고 완성도 높은 평가서 작성을 위한 구체적인 제안사항입니다.
+                    </p>
+                    <ul className="space-y-3">
+                      {analysis.suggestions.map((suggestion, index) => (
+                        <li key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                          <span className="text-blue-600 mt-1 flex-shrink-0">•</span>
+                          <span className="text-gray-700">{suggestion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* 활용 안내 */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h3 className="text-blue-800 font-medium mb-3 flex items-center gap-2">
+                    <span>💡</span>
+                    <span>평가서 개선 활용 방법</span>
+                  </h3>
+                  <div className="text-blue-700 text-sm space-y-2">
+                    <p>1. <strong>개선 제안</strong>을 참고하여 부족한 영역을 보완해보세요</p>
+                    <p>2. <strong>우수한 점</strong>은 다른 평가서 작성 시에도 계속 활용하세요</p>
+                    <p>3. 아래 "개선된 평가서 생성하기" 버튼으로 AI가 제안하는 개선 버전을 확인할 수 있습니다</p>
+                    <p>4. 생성된 개선 버전을 참고하여 본인만의 스타일로 재작성해보세요</p>
+                  </div>
+                </div>
+
+                {/* 개선된 평가서 생성 버튼 */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  {isGenerating && (
+                    <div className="mb-6 text-center">
+                      <div className="flex justify-center items-center gap-4 mb-4">
+                        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            개선된 평가서를 생성하고 있어요
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            예상 소요 시간: {getEstimatedGenerationTime()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <span className="text-green-600">✨</span>
+                          <span className="text-green-600">📝</span>
+                        </div>
+                        <p className="text-green-700 font-medium text-center" style={{ minHeight: '24px' }}>
+                          {currentGenerationMessage}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-center">
+                    <button
+                      onClick={generateImprovement}
+                      disabled={isGenerating || isGenerationComplete}
+                      className={`
+                        px-8 py-4 rounded-lg font-semibold text-white transition-all duration-200
+                        ${getGenerationButtonColor()}
+                        flex items-center gap-3 min-w-[250px] justify-center mx-auto
+                      `}
                     >
-                      <Group justify="center" gap="xs" mb="xs">
-                        <IconSparkles size={16} color="var(--mantine-color-green-6)" />
-                        <IconFileText size={16} color="var(--mantine-color-blue-6)" />
-                      </Group>
-                      <Text
-                        size="sm"
-                        fw={500}
-                        style={{
-                          color: 'var(--mantine-color-green-7)',
-                          lineHeight: 1.4,
-                          minHeight: '40px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        {currentGenerationMessage}
-                      </Text>
-                    </Box>
-                  </Box>
-                )}
+                      {isGenerating ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>개선 중...</span>
+                        </>
+                      ) : isGenerationComplete ? (
+                        <>
+                          <span>✓</span>
+                          <span>개선 완료</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📈</span>
+                          <span>개선된 평가서 생성하기</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-                <Button
-                  fullWidth
-                  size="lg"
-                  color={getGenerationButtonColor()}
-                  onClick={generateImprovement}
-                  disabled={isGenerating || isGenerationComplete}
-                  leftSection={
-                    isGenerationComplete ? <IconCheck size={20} /> :
-                    isGenerating ? <Loader size={20} /> :
-                    <IconTrendingUp size={20} />
-                  }
-                >
-                  {getGenerationButtonText()}
-                </Button>
+        {/* 개선 버전 탭 */}
+        {activeTab === 'improved' && (
+          <div className="space-y-6">
+            {isGenerating && !isGenerationComplete && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+                <div className="w-16 h-16 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-6"></div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">개선된 평가서를 생성하고 있어요</h3>
+                <p className="text-gray-600 mb-4">예상 소요 시간: {getEstimatedGenerationTime()}</p>
 
-                {isGenerationComplete && (
-                  <Alert variant="light" color="green" mt="md" icon={<IconCheck />}>
-                    <Text fw={500}>개선된 평가서 생성이 완료되었습니다!</Text>
-                    <Text size="sm" mt="xs">
-                      개선된 평가서 탭에서 결과를 확인하세요.
-                      다른 평가서를 개선하려면 페이지를 새로고침하세요.
-                    </Text>
-                  </Alert>
-                )}
-              </Card>
-            </Stack>
-          )}
-        </Tabs.Panel>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <span className="text-green-600">✨</span>
+                    <span className="text-green-600">📝</span>
+                  </div>
+                  <p className="text-green-700 font-medium text-center" style={{ minHeight: '24px' }}>
+                    {currentGenerationMessage}
+                  </p>
+                </div>
 
-        {/* 개선된 평가서 탭 */}
-        <Tabs.Panel value="improved">
-          {improvedReport && (
-            <Card shadow="sm" padding="lg" radius="md" withBorder>
-              <Group justify="space-between" mb="md">
-                <Title order={3}>개선된 평가서</Title>
-                <Button
-                  leftSection={<IconDownload size={16} />}
-                  onClick={() => {
-                    const blob = new Blob([improvedReport], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `개선된_평가서_${childName || '아동'}_${new Date().toISOString().split('T')[0]}.txt`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                >
-                  다운로드
-                </Button>
-              </Group>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: '75%' }}
+                  ></div>
+                </div>
+              </div>
+            )}
 
-              <Paper p="md" style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
-                <Text style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                  {improvedReport}
-                </Text>
-              </Paper>
-            </Card>
-          )}
-        </Tabs.Panel>
-      </Tabs>
-    </Container>
+            {isGenerationComplete && improvedReport && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold flex items-center gap-2">
+                    <span>✨</span>
+                    <span>개선된 평가서</span>
+                  </h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(improvedReport)}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                    >
+                      <span>📋</span>
+                      <span>복사</span>
+                    </button>
+                    <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2">
+                      <span>📄</span>
+                      <span>다운로드</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="prose max-w-none">
+                    <pre className="whitespace-pre-wrap font-sans text-gray-700 text-sm leading-relaxed">
+                      {improvedReport}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* 개선 후 안내 */}
+                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="text-blue-800 font-medium mb-2 flex items-center gap-2">
+                    <span>💡</span>
+                    <span>개선된 평가서 활용 팁</span>
+                  </h4>
+                  <ul className="text-blue-700 text-sm space-y-1">
+                    <li>• 생성된 내용을 그대로 사용하지 마시고, 실제 관찰한 내용에 맞게 수정해주세요</li>
+                    <li>• 아동의 개별 특성과 실제 발달 상황을 반영하여 개인화해주세요</li>
+                    <li>• 전문적인 표현 방법과 구조를 참고하여 다른 평가서 작성에도 활용해보세요</li>
+                    <li>• 궁금한 부분이 있다면 교육과정 전문가나 원장선생님께 문의해보세요</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

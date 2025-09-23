@@ -1,34 +1,7 @@
-// src/app/dashboard/page.tsx (기존 로직 + Mantine 스타일)
+// src/app/dashboard/page.tsx (TailwindCSS 스타일)
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Container,
-  Title,
-  Text,
-  Paper,
-  Group,
-  Stack,
-  Grid,
-  Card,
-  Badge,
-  ActionIcon,
-  Progress,
-  SimpleGrid,
-  ThemeIcon
-} from '@mantine/core';
-import {
-  IconFileText,
-  IconSearch,
-  IconTrendingUp,
-  IconClock,
-  IconCheck,
-  IconAlertCircle,
-  IconChartBar,
-  IconUsers,
-  IconStar,
-  IconArrowRight
-} from '@tabler/icons-react';
 import Link from 'next/link';
 
 interface DashboardStats {
@@ -87,266 +60,246 @@ export default function Dashboard() {
       title: '새 평가서 생성',
       description: '키워드 입력으로 평가서 작성',
       href: '/',
-      icon: IconFileText,
+      icon: '📄',
       color: 'blue'
     },
     {
       title: '평가서 검토',
       description: '기존 평가서 분석 및 피드백',
       href: '/feedback',
-      icon: IconSearch,
+      icon: '🔍',
       color: 'green'
     },
     {
       title: '템플릿 보기',
       description: '저장된 템플릿 관리',
       href: '/templates',
-      icon: IconStar,
+      icon: '⭐',
       color: 'violet'
     }
   ];
 
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case 'generate': return IconFileText;
-      case 'analyze': return IconSearch;
-      case 'improve': return IconTrendingUp;
-      default: return IconFileText;
+      case 'generate': return '📄';
+      case 'analyze': return '🔍';
+      case 'improve': return '📈';
+      default: return '📄';
     }
   };
 
   const getActivityColor = (type: string) => {
     switch (type) {
-      case 'generate': return 'blue';
-      case 'analyze': return 'green';
-      case 'improve': return 'violet';
-      default: return 'gray';
+      case 'generate': return 'text-blue-600 bg-blue-50';
+      case 'analyze': return 'text-green-600 bg-green-50';
+      case 'improve': return 'text-violet-600 bg-violet-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <IconCheck size={16} color="var(--mantine-color-green-6)" />;
-      case 'in_progress': return <IconClock size={16} color="var(--mantine-color-yellow-6)" />;
-      case 'failed': return <IconAlertCircle size={16} color="var(--mantine-color-red-6)" />;
-      default: return <IconClock size={16} color="var(--mantine-color-gray-6)" />;
+      case 'completed': return <span className="text-green-600">✓</span>;
+      case 'in_progress': return <span className="text-yellow-600">⏳</span>;
+      case 'failed': return <span className="text-red-600">⚠️</span>;
+      default: return <span className="text-gray-600">•</span>;
     }
   };
 
   return (
-    <Container size="xl" py="xl">
-      {/* 헤더 */}
-      <Stack mb="xl">
-        <Title order={1} size="h1" c="dark">
-          평가서 관리 대시보드
-        </Title>
-        <Text c="dimmed" size="lg">
-          2024 개정 표준보육과정 기반 AI 평가서 통합 관리 시스템
-        </Text>
-      </Stack>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* 헤더 */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">대시보드</h1>
+          <p className="text-gray-600">
+            평가서 생성 및 분석 현황을 한눈에 확인하세요
+          </p>
+        </div>
 
-      {/* 통계 카드 */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} mb="xl">
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" fw={500} c="dimmed">생성된 평가서</Text>
-              <Text size="xl" fw={700}>{stats.totalReports}</Text>
+        {/* 통계 카드 */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">📊</span>
+              </div>
+              <span className="text-2xl font-bold text-gray-900">{stats.totalReports}</span>
             </div>
-            <ThemeIcon size={48} radius="md" variant="light" color="blue">
-              <IconFileText size={24} />
-            </ThemeIcon>
-          </Group>
-          <Group mt="md" gap="xs">
-            <IconTrendingUp size={16} color="var(--mantine-color-green-6)" />
-            <Text size="sm" c="green" fw={500}>이번 달 +12</Text>
-          </Group>
-        </Card>
+            <h3 className="font-semibold text-gray-700 mb-1">총 생성 평가서</h3>
+            <p className="text-sm text-gray-500">누적 생성된 평가서 수</p>
+          </div>
 
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" fw={500} c="dimmed">분석 완료</Text>
-              <Text size="xl" fw={700}>{stats.analysisCount}</Text>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">🔍</span>
+              </div>
+              <span className="text-2xl font-bold text-gray-900">{stats.analysisCount}</span>
             </div>
-            <ThemeIcon size={48} radius="md" variant="light" color="green">
-              <IconSearch size={24} />
-            </ThemeIcon>
-          </Group>
-          <Group mt="md" gap="xs">
-            <IconTrendingUp size={16} color="var(--mantine-color-green-6)" />
-            <Text size="sm" c="green" fw={500}>이번 주 +8</Text>
-          </Group>
-        </Card>
+            <h3 className="font-semibold text-gray-700 mb-1">분석 완료</h3>
+            <p className="text-sm text-gray-500">평가서 품질 분석 횟수</p>
+          </div>
 
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" fw={500} c="dimmed">평균 점수</Text>
-              <Text size="xl" fw={700}>{stats.averageScore}</Text>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">⭐</span>
+              </div>
+              <span className="text-2xl font-bold text-gray-900">{stats.averageScore.toFixed(1)}</span>
             </div>
-            <ThemeIcon size={48} radius="md" variant="light" color="yellow">
-              <IconChartBar size={24} />
-            </ThemeIcon>
-          </Group>
-          <Group mt="md" gap="xs">
-            <IconTrendingUp size={16} color="var(--mantine-color-green-6)" />
-            <Text size="sm" c="green" fw={500}>+2.3점 향상</Text>
-          </Group>
-        </Card>
+            <h3 className="font-semibold text-gray-700 mb-1">평균 점수</h3>
+            <p className="text-sm text-gray-500">평가서 품질 평균 점수</p>
+          </div>
 
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" fw={500} c="dimmed">개선률</Text>
-              <Text size="xl" fw={700}>{stats.improvementRate}%</Text>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">📈</span>
+              </div>
+              <span className="text-2xl font-bold text-gray-900">+{stats.improvementRate}%</span>
             </div>
-            <ThemeIcon size={48} radius="md" variant="light" color="violet">
-              <IconUsers size={24} />
-            </ThemeIcon>
-          </Group>
-          <Group mt="md" gap="xs">
-            <IconTrendingUp size={16} color="var(--mantine-color-green-6)" />
-            <Text size="sm" c="green" fw={500}>+5.2% 증가</Text>
-          </Group>
-        </Card>
-      </SimpleGrid>
+            <h3 className="font-semibold text-gray-700 mb-1">품질 개선률</h3>
+            <p className="text-sm text-gray-500">AI 개선 후 점수 향상</p>
+          </div>
+        </div>
 
-      <Grid>
-        {/* 빠른 작업 */}
-        <Grid.Col span={{ base: 12, lg: 4 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder h="100%">
-            <Stack gap="md">
-              <div>
-                <Title order={3} size="h4">빠른 작업</Title>
-                <Text size="sm" c="dimmed">자주 사용하는 기능들</Text>
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* 빠른 작업 */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold mb-6">빠른 작업</h2>
+              <div className="space-y-4">
+                {quickActions.map((action, index) => (
+                  <Link
+                    key={index}
+                    href={action.href}
+                    className="block p-4 rounded-xl border-2 border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all duration-200 group"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="text-2xl">{action.icon}</div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">
+                          {action.title}
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {action.description}
+                        </p>
+                      </div>
+                      <div className="text-indigo-400 group-hover:text-indigo-600 transition-colors">
+                        →
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 최근 활동 */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">최근 활동</h2>
+                <Link
+                  href="/history"
+                  className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                >
+                  전체 보기 →
+                </Link>
               </div>
 
-              <Stack gap="sm">
-                {quickActions.map((action, index) => {
-                  const Icon = action.icon;
-                  return (
-                    <Paper
-                      key={index}
-                      component={Link}
-                      href={action.href}
-                      p="md"
-                      withBorder
-                      style={{ textDecoration: 'none', color: 'inherit' }}
-                      className="hover-card"
-                    >
-                      <Group>
-                        <ThemeIcon size={40} radius="md" variant="light" color={action.color}>
-                          <Icon size={20} />
-                        </ThemeIcon>
-                        <div style={{ flex: 1 }}>
-                          <Text fw={500} size="sm">{action.title}</Text>
-                          <Text size="xs" c="dimmed">{action.description}</Text>
-                        </div>
-                        <ActionIcon variant="subtle" color="gray">
-                          <IconArrowRight size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Paper>
-                  );
-                })}
-              </Stack>
-            </Stack>
-          </Card>
-        </Grid.Col>
+              <div className="space-y-4">
+                {recentActivities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors"
+                  >
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getActivityColor(activity.type)}`}>
+                      <span className="text-lg">{getActivityIcon(activity.type)}</span>
+                    </div>
 
-        {/* 최근 활동 */}
-        <Grid.Col span={{ base: 12, lg: 8 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder h="100%">
-            <Stack gap="md">
-              <Group justify="space-between">
-                <div>
-                  <Title order={3} size="h4">최근 활동</Title>
-                  <Text size="sm" c="dimmed">최근 작업한 평가서들</Text>
-                </div>
-                <Text
-                  component={Link}
-                  href="/history"
-                  size="sm"
-                  c="indigo"
-                  fw={500}
-                  style={{ textDecoration: 'none' }}
-                >
-                  전체 보기
-                </Text>
-              </Group>
-
-              {recentActivities.length > 0 ? (
-                <Stack gap="sm">
-                  {recentActivities.map((activity) => {
-                    const Icon = getActivityIcon(activity.type);
-                    const color = getActivityColor(activity.type);
-
-                    return (
-                      <Paper key={activity.id} p="md" withBorder bg="gray.0">
-                        <Group>
-                          <ThemeIcon size={40} radius="md" variant="light" color={color}>
-                            <Icon size={20} />
-                          </ThemeIcon>
-                          <div style={{ flex: 1 }}>
-                            <Text fw={500} size="sm">{activity.title}</Text>
-                            <Group gap="xs" mt={4}>
-                              <Text size="xs" c="dimmed">{activity.timestamp}</Text>
-                              {activity.score && (
-                                <>
-                                  <Text size="xs" c="dimmed">•</Text>
-                                  <Text size="xs" fw={500}>
-                                    점수: {activity.score}점
-                                  </Text>
-                                </>
-                              )}
-                            </Group>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900">
+                        {activity.title}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className="text-sm text-gray-500">
+                          {activity.timestamp}
+                        </span>
+                        {activity.score && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm text-gray-500">점수:</span>
+                            <span className={`text-sm font-medium ${
+                              activity.score >= 80 ? 'text-green-600' :
+                              activity.score >= 60 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {activity.score}점
+                            </span>
                           </div>
-                          <div>
-                            {getStatusIcon(activity.status)}
-                          </div>
-                        </Group>
-                      </Paper>
-                    );
-                  })}
-                </Stack>
-              ) : (
-                <Stack align="center" py="xl">
-                  <ThemeIcon size={48} radius="md" variant="light" color="gray">
-                    <IconFileText size={24} />
-                  </ThemeIcon>
-                  <div style={{ textAlign: 'center' }}>
-                    <Text fw={500} mb="xs">아직 활동이 없습니다</Text>
-                    <Text size="sm" c="dimmed" mb="md">새로운 평가서를 생성하거나 기존 평가서를 분석해보세요.</Text>
-                    <Link href="/" style={{ textDecoration: 'none' }}>
-                      <Paper p="sm" withBorder c="indigo" fw={500} style={{ display: 'inline-block' }}>
-                        평가서 생성하기
-                      </Paper>
-                    </Link>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(activity.status)}
+                    </div>
                   </div>
-                </Stack>
+                ))}
+              </div>
+
+              {recentActivities.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">📝</div>
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                    아직 활동이 없습니다
+                  </h3>
+                  <p className="text-gray-500 mb-6">
+                    첫 번째 평가서를 생성해보세요!
+                  </p>
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    <span>평가서 생성하기</span>
+                    <span>→</span>
+                  </Link>
+                </div>
               )}
-            </Stack>
-          </Card>
-        </Grid.Col>
-      </Grid>
+            </div>
+          </div>
+        </div>
 
-      <style jsx>{`
-        .hover-card:hover {
-          transform: translateY(-2px);
-          box-shadow: var(--mantine-shadow-md);
-          transition: all 0.2s ease;
-        }
-      `}</style>
-
-      {/* 푸터 */}
-      <Group justify="center" mt="xl" pt="xl">
-        <Text size="sm" c="dimmed" ta="center">
-          Powered by Claude AI · 2024 개정 표준보육과정 기반 · 보육교사 전용 도구
-        </Text>
-      </Group>
-
-
-    </Container>
+        {/* 진행률 차트 (간단한 버전) */}
+        <div className="mt-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold mb-6">이번 달 활동</h2>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-blue-600 mb-2">24</div>
+                <div className="text-sm text-gray-600">생성된 평가서</div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                  <div className="bg-blue-600 h-2 rounded-full" style={{width: '75%'}}></div>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-green-600 mb-2">18</div>
+                <div className="text-sm text-gray-600">분석 완료</div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                  <div className="bg-green-600 h-2 rounded-full" style={{width: '60%'}}></div>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-violet-600 mb-2">12</div>
+                <div className="text-sm text-gray-600">개선 완료</div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                  <div className="bg-violet-600 h-2 rounded-full" style={{width: '40%'}}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
